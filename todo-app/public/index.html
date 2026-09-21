@@ -74,7 +74,7 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .form.open{display:flex}
 .form .inp.main-in{background:#fff;border:1.5px solid var(--ink)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
-.chip{display:flex;align-items:center;border-radius:999px;font-size:13px;font-weight:600;border:1.5px solid transparent;transition:.15s}
+.chip{display:flex;align-items:center;border-radius:999px;font-size:13px;font-weight:600;background:#fff;border:1.5px solid var(--line2);transition:.15s}
 .chip .cn{display:flex;align-items:center;gap:6px;background:none;color:inherit;font-weight:600;font-size:13px;padding:6px 12px}
 .chip .cn i{width:8px;height:8px;border-radius:50%}
 .chip .cx{background:none;color:inherit;opacity:.35;font-size:15px;line-height:1;padding:6px 10px 6px 4px}
@@ -84,7 +84,7 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .edit-btn{background:none;color:var(--sub);font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px}
 .edit-btn:hover{background:var(--soft);color:var(--ink)}
 .edit-btn.on{background:var(--ink);color:#fff}
-.chip.add{background:none;border:1.5px dashed var(--line2);color:var(--sub);padding:6px 12px;font-size:13px;font-weight:600}
+.chip.add{background:#fff;border:1.5px dashed var(--line2);color:var(--sub);padding:6px 12px;font-size:13px;font-weight:600}
 .chip.add:hover{color:var(--ink);border-color:var(--ink)}
 .chip.editing{padding-left:12px;border-style:dashed;border-color:currentColor}
 .chip.editing>i{width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none}
@@ -255,8 +255,8 @@ function render(){
   const mv=$("mCat").value;$("mCat").innerHTML=opts;if(S.cats.some(c=>c.n===mv))$("mCat").value=mv;
   $("mDot").style.background=cat($("mCat").value).dot;
   $("chips").innerHTML=S.cats.map(c=>catEdit
-    ?`<div class="chip editing" style="background:${c.bg};color:${c.tx}"><i style="background:${c.dot}"></i><input class="cname" data-n="${esc(c.n)}" value="${esc(c.n)}" maxlength="12" size="${Math.max(3,c.n.length+1)}" aria-label="카테고리 이름"><button class="cx" data-n="${esc(c.n)}" title="카테고리 삭제" aria-label="${esc(c.n)} 삭제">×</button></div>`
-    :`<div class="chip ${c.n===fCat?"on":""}" style="background:${c.bg};color:${c.tx}"><button class="cn" data-n="${esc(c.n)}"><i style="background:${c.dot}"></i>${esc(c.n)}</button></div>`).join("")
+    ?`<div class="chip editing" style="color:${c.tx}"><i style="background:${c.dot}"></i><input class="cname" data-n="${esc(c.n)}" value="${esc(c.n)}" maxlength="12" size="${Math.max(3,c.n.length+1)}" aria-label="카테고리 이름"><button class="cx" data-n="${esc(c.n)}" title="카테고리 삭제" aria-label="${esc(c.n)} 삭제">×</button></div>`
+    :`<div class="chip ${c.n===fCat?"on":""}" style="color:${c.tx}"><button class="cn" data-n="${esc(c.n)}"><i style="background:${c.dot}"></i>${esc(c.n)}</button></div>`).join("")
     +(catEdit?"":`<button class="chip add" id="addChip">+ 추가</button>`);
   $("chips").querySelectorAll(".cn").forEach(b=>b.onclick=()=>{fCat=b.dataset.n;render()});
   $("chips").querySelectorAll(".cx").forEach(b=>b.onclick=()=>deleteCat(b.dataset.n));
