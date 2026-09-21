@@ -24,6 +24,29 @@ function lsSave(d){
 const clone=x=>JSON.parse(JSON.stringify(x));
 const RE_DATE=/^\d{4}-\d{2}-\d{2}$/,RE_MONTH=/^\d{4}-\d{2}$/,RE_HEX=/^#[0-9a-fA-F]{6}$/;
 const need=(v,name,max)=>{if(typeof v!=="string"||!v.trim())throw new ApiError(400,name+"을(를) 입력하세요");if(v.trim().length>max)throw new ApiError(400,name+"은(는) "+max+"자 이하여야 해요");return v.trim()};
+function readDl(dl){
+  if(!dl)return null;
+  if(!RE_DATE.test(dl.date||"")||isNaN(Date.parse(dl.date)))throw new ApiError(400,"마감일이 올바르지 않아요");
+  return {date:dl.date,label:String(dl.label||"").trim().slice(0,4)};
+}
+function readRp(r,start,hasDl){
+  if(!r)return null;
+  if(hasDl)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
+  if(!["daily","weekly","monthly"].includes(r.type))throw new ApiError(400,"반복 종류가 올바르지 않아요");
+  let days=[];
+  if(r.type==="weekly"){
+    if(!Array.isArray(r.days))throw new ApiError(400,"반복할 요일을 선택하세요");
+    days=[...new Set(r.days)].sort();
+    if(!days.length||days.some(x=>!Number.isInteger(x)||x<0||x>6))throw new ApiError(400,"반복할 요일을 선택하세요");
+  }
+  let until=null;
+  if(r.until){
+    if(!RE_DATE.test(r.until)||isNaN(Date.parse(r.until)))throw new ApiError(400,"반복 종료일이 올바르지 않아요");
+    if(r.until<start)throw new ApiError(400,"종료일은 시작일 이후여야 해요");
+    until=r.until;
+  }
+  return {type:r.type,days,until};
+}
 async function api(method,url,body){
   body=body||{};
   const d=lsLoad(),u=new URL(url,"http://x"),p=u.pathname;let m;
@@ -63,28 +86,7 @@ async function api(method,url,body){
   if(method==="POST"&&p==="/api/todos"){
     const text=need(body.text,"할 일",200);
     if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"날짜가 올바르지 않아요");
-    const cat=catOk(body.cat);let dl=null;
-    if(body.dl){if(!RE_DATE.test(body.dl.date||"")||isNaN(Date.parse(body.dl.date)))throw new ApiError(400,"마감일이 올바르지 않아요");
-      dl={date:body.dl.date,label:String(body.dl.label||"").trim().slice(0,4)}}
-    let repeat=null;
-    if(body.repeat){
-      const r=body.repeat;
-      if(dl)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
-      if(!["daily","weekly","monthly"].includes(r.type))throw new ApiError(400,"반복 종류가 올바르지 않아요");
-      let days=[];
-      if(r.type==="weekly"){
-        if(!Array.isArray(r.days))throw new ApiError(400,"반복할 요일을 선택하세요");
-        days=[...new Set(r.days)].sort();
-        if(!days.length||days.some(x=>!Number.isInteger(x)||x<0||x>6))throw new ApiError(400,"반복할 요일을 선택하세요");
-      }
-      let until=null;
-      if(r.until){
-        if(!RE_DATE.test(r.until)||isNaN(Date.parse(r.until)))throw new ApiError(400,"반복 종료일이 올바르지 않아요");
-        if(r.until<body.date)throw new ApiError(400,"종료일은 시작일 이후여야 해요");
-        until=r.until;
-      }
-      repeat={type:r.type,days,until};
-    }
+    const cat=catOk(body.cat),dl=readDl(body.dl),repeat=readRp(body.repeat,body.date,!!dl);
     const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[],skipDates:[]};d.todos.push(t);lsSave(d);return clone(t);
   }
   if(method==="POST"&&p==="/api/monthly"){
@@ -95,12 +97,12 @@ async function api(method,url,body){
   }
   if(method==="PATCH"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){
     const t=find(d.todos,m[1]);
-    if(body.text!==undefined)t.text=need(body.text,"할 일",200);
     if(body.skip!==undefined){
       if(!t.repeat)throw new ApiError(400,"반복 일정만 건너뛸 수 있어요");
       if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"건너뛸 날짜가 필요해요");
       const set=new Set(t.skipDates||[]);body.skip?set.add(body.date):set.delete(body.date);t.skipDates=[...set].sort();
     }
+    if(body.text!==undefined)t.text=need(body.text,"할 일",200);
     if(body.done!==undefined){
       if(t.repeat){
         if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 완료할 날짜가 필요해요");
@@ -108,12 +110,20 @@ async function api(method,url,body){
       }else t.done=!!body.done;
     }
     if(body.cat!==undefined)t.cat=catOk(body.cat);
+    if("dl" in body||"repeat" in body){
+      const dl="dl" in body?readDl(body.dl):(t.dl||null);
+      const repeat="repeat" in body?readRp(body.repeat,t.date,!!dl):(t.repeat||null);
+      if(dl&&repeat)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
+      if(t.repeat&&!repeat){t.doneDates=[];t.skipDates=[]}
+      t.dl=dl;t.repeat=repeat;
+    }
     lsSave(d);return clone(t);
   }
   if(method==="PATCH"&&(m=p.match(/^\/api\/monthly\/(\d+)$/))){
     const t=find(Object.values(d.monthly).flat(),m[1]);
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
     if(body.done!==undefined)t.done=!!body.done;
+    if(body.cat!==undefined)t.cat=catOk(body.cat);
     lsSave(d);return clone(t);
   }
   if(method==="DELETE"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){

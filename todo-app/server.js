@@ -144,33 +144,37 @@ route("DELETE", "/api/categories/([^/]+)", ([, raw], { query }) => {
   return [204];
 });
 
+function readDeadline(dl) {
+  if (!dl) return { dlDate: null, dlLabel: null };
+  if (!validDate(dl.date)) throw bad("마감일이 올바르지 않아요");
+  return { dlDate: dl.date, dlLabel: String(dl.label || "").trim().slice(0, 4) };
+}
+function readRepeat(r, startDate, hasDeadline) {
+  if (!r) return { rType: null, rDays: null, rUntil: null };
+  if (hasDeadline) throw bad("반복 일정에는 마감일을 함께 설정할 수 없어요");
+  const rType = r.type;
+  if (!["daily", "weekly", "monthly"].includes(rType)) throw bad("반복 종류가 올바르지 않아요");
+  let rDays = null, rUntil = null;
+  if (rType === "weekly") {
+    if (!Array.isArray(r.days)) throw bad("반복할 요일을 선택하세요");
+    const days = [...new Set(r.days)].sort();
+    if (!days.length || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw bad("반복할 요일을 선택하세요");
+    rDays = days.join(",");
+  }
+  if (r.until) {
+    if (!validDate(r.until)) throw bad("반복 종료일이 올바르지 않아요");
+    if (r.until < startDate) throw bad("종료일은 시작일 이후여야 해요");
+    rUntil = r.until;
+  }
+  return { rType, rDays, rUntil };
+}
+
 route("POST", "/api/todos", (_, { body }) => {
   const text = str(body.text, "할 일", 200);
   if (!validDate(body.date)) throw bad("날짜가 올바르지 않아요");
   const cat = catExists(body.cat);
-  let dlDate = null, dlLabel = null;
-  if (body.dl) {
-    if (!validDate(body.dl.date)) throw bad("마감일이 올바르지 않아요");
-    dlDate = body.dl.date;
-    dlLabel = String(body.dl.label || "").trim().slice(0, 4);
-  }
-  let rType = null, rDays = null, rUntil = null;
-  if (body.repeat) {
-    if (dlDate) throw bad("반복 일정에는 마감일을 함께 설정할 수 없어요");
-    rType = body.repeat.type;
-    if (!["daily", "weekly", "monthly"].includes(rType)) throw bad("반복 종류가 올바르지 않아요");
-    if (rType === "weekly") {
-      if (!Array.isArray(body.repeat.days)) throw bad("반복할 요일을 선택하세요");
-      const days = [...new Set(body.repeat.days)].sort();
-      if (!days.length || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw bad("반복할 요일을 선택하세요");
-      rDays = days.join(",");
-    }
-    if (body.repeat.until) {
-      if (!validDate(body.repeat.until)) throw bad("반복 종료일이 올바르지 않아요");
-      if (body.repeat.until < body.date) throw bad("종료일은 시작일 이후여야 해요");
-      rUntil = body.repeat.until;
-    }
-  }
+  const { dlDate, dlLabel } = readDeadline(body.dl);
+  const { rType, rDays, rUntil } = readRepeat(body.repeat, body.date, !!dlDate);
   const { lastInsertRowid } = db.prepare(
     "INSERT INTO todos(date,text,cat,dl_date,dl_label,repeat_type,repeat_days,repeat_until) VALUES (?,?,?,?,?,?,?,?)")
     .run(body.date, text, cat, dlDate, dlLabel, rType, rDays, rUntil);
@@ -196,7 +200,16 @@ route("PATCH", "/api/todos/(\\d+)", ([, id], { body }) => {
     } else done = body.done ? 1 : 0;
   }
   const cat = body.cat !== undefined ? catExists(body.cat) : row.cat;
-  db.prepare("UPDATE todos SET text=?, done=?, cat=? WHERE id=?").run(text, done, cat, id);
+  let dlDate = row.dl_date, dlLabel = row.dl_label, rType = row.repeat_type, rDays = row.repeat_days, rUntil = row.repeat_until;
+  if ("dl" in body) ({ dlDate, dlLabel } = readDeadline(body.dl));
+  if ("repeat" in body) ({ rType, rDays, rUntil } = readRepeat(body.repeat, row.date, !!dlDate));
+  if (dlDate && rType) throw bad("반복 일정에는 마감일을 함께 설정할 수 없어요");
+  if (row.repeat_type && !rType) { // no longer recurring: drop per-day records
+    db.prepare("DELETE FROM todo_done WHERE todo_id=?").run(id);
+    db.prepare("DELETE FROM todo_skip WHERE todo_id=?").run(id);
+  }
+  db.prepare("UPDATE todos SET text=?, done=?, cat=?, dl_date=?, dl_label=?, repeat_type=?, repeat_days=?, repeat_until=? WHERE id=?")
+    .run(text, done, cat, dlDate, dlLabel, rType, rDays, rUntil, id);
   return todoOut(db.prepare("SELECT * FROM todos WHERE id=?").get(id));
 });
 
@@ -218,7 +231,8 @@ route("PATCH", "/api/monthly/(\\d+)", ([, id], { body }) => {
   if (!row) throw new HttpError(404, "할 일을 찾을 수 없어요");
   const text = body.text !== undefined ? str(body.text, "할 일", 200) : row.text;
   const done = body.done !== undefined ? (body.done ? 1 : 0) : row.done;
-  db.prepare("UPDATE monthly SET text=?, done=? WHERE id=?").run(text, done, id);
+  const cat = body.cat !== undefined ? catExists(body.cat) : row.cat;
+  db.prepare("UPDATE monthly SET text=?, done=?, cat=? WHERE id=?").run(text, done, cat, id);
   return monthlyOut(db.prepare("SELECT * FROM monthly WHERE id=?").get(id));
 });
 
