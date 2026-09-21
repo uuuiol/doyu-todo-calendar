@@ -92,7 +92,7 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .newcat[hidden]{display:none}
 .newcat{display:flex;align-items:center;gap:10px;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 5px 5px 8px;transition:.15s}
 .newcat:focus-within{border-color:var(--ink)}
-.swatch{position:relative;width:26px;height:26px;border-radius:50%;background:#8b5cf6;flex:none;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7),0 0 0 1px var(--line)}
+.swatch{position:relative;width:26px;height:26px;border-radius:50%;background:#1b1d21;flex:none;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7),0 0 0 1px var(--line)}
 .swatch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .newcat>input[type=text]{flex:1;min-width:0;border:0;outline:none;background:none;font-size:13px;padding:6px 0}
 .newcat>input::placeholder{color:var(--sub)}
@@ -170,7 +170,7 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
         <div class="cat-head"><span class="label">카테고리</span><button class="edit-btn" id="catEdit">✎ 수정</button></div>
         <div class="chips" id="chips"></div>
         <div class="newcat" id="newcat" hidden>
-          <label class="swatch" id="ncSwatch" title="색상 선택"><input type="color" id="ncColor" value="#8b5cf6"></label>
+          <label class="swatch" id="ncSwatch" title="색상 선택"><input type="color" id="ncColor" value="#1b1d21"></label>
           <input id="ncName" type="text" placeholder="새 카테고리 이름" maxlength="12" autocomplete="off">
           <button id="ncAdd" disabled>추가</button>
         </div>
@@ -351,7 +351,7 @@ $("ncName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("ncAdd").clic
 $("ncAdd").onclick=()=>run(async()=>{const n=$("ncName").value.trim();if(!n)return;
   if(S.cats.some(c=>c.n===n)){toast("이미 있는 카테고리예요");return}
   const c=await api("POST","/api/categories",{name:n,...(({dot,bg,tx})=>({dot,bg,tx}))(mkCat(n,$("ncColor").value))});
-  S.cats.push(c);fCat=c.n;$("ncName").value="";$("ncAdd").disabled=true;newOpen=false;render()});
+  S.cats.push(c);fCat=c.n;$("ncName").value="";$("ncAdd").disabled=true;newOpen=false;$("ncColor").value="#1b1d21";$("ncSwatch").style.background="#1b1d21";render()});
 $("mAdd").onclick=()=>run(async()=>{const t=$("mText").value.trim();if(!t)return;const mk=key(view).slice(0,7);
   const m=await api("POST","/api/monthly",{month:mk,text:t,cat:$("mCat").value});
   (S.monthly[mk]=S.monthly[mk]||[]).push(m);$("mText").value="";render()});
