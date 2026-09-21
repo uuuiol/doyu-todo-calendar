@@ -1,0 +1,5 @@
+# Install to /etc/caddy/Caddyfile, replace the domain with yours.
+mytodo.duckdns.org {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}

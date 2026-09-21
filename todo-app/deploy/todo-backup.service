@@ -1,0 +1,15 @@
+[Unit]
+Description=DoYu Todo Calendar DB backup
+
+[Service]
+Type=oneshot
+User=todo
+Group=todo
+EnvironmentFile=/etc/todo-app.env
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/todo-app/backup.sh
+StateDirectory=todo-app
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

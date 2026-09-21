@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DoYu Todo Calendar</title>
+<style>
+:root{--bg:#fff;--ink:#1b1d21;--sub:#8a8f98;--line:#eceef1;--line2:#d9d9d9;--soft:#f6f7f9;--form:#fafbfc}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:40px 60px;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0}
+h1{font-size:24px;font-weight:700;margin-bottom:24px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.label{font-size:12px;font-weight:600;color:var(--sub)}
+.row{display:flex;gap:8px;align-items:center}
+.grow{flex:1;min-width:0}
+
+/* inputs & buttons */
+.inp{width:100%;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:14px;outline:none}
+.inp::placeholder{color:var(--sub)}
+.inp:focus{border-color:var(--ink);background:#fff}
+.inp.white{background:#fff}
+.sel{position:relative;display:flex;align-items:center;gap:8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:0 12px 0 14px;height:43px}
+.sel.white{background:#fff}
+.sel i{width:8px;height:8px;border-radius:50%;flex:none}
+.sel select{appearance:none;border:0;background:none;outline:none;font-size:14px;padding-right:16px;cursor:pointer;height:100%}
+.sel::after{content:"⌄";position:absolute;right:10px;top:9px;font-size:13px;color:var(--sub);pointer-events:none}
+.btn{background:var(--soft);color:var(--ink);border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600;white-space:nowrap}
+.btn.dark{background:var(--ink);color:#fff}
+.btn:hover{opacity:.85}
+.btn.sm{padding:8px 12px;font-size:13px}
+
+/* monthly */
+.month h2{font-size:14px;font-weight:600;color:var(--sub);margin-bottom:14px}
+.month .list{margin-top:14px}
+
+/* main layout */
+.main{display:grid;grid-template-columns:480px 1fr;gap:24px;margin-top:24px;align-items:start}
+.left{display:flex;flex-direction:column;gap:16px}
+.panel{border-color:var(--line2);padding:24px;display:flex;flex-direction:column;gap:16px}
+
+/* calendar */
+.cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.cal-head b{font-size:16px}
+.nav{background:var(--soft);width:30px;height:30px;border-radius:8px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.dow{font-size:11px;color:var(--sub);padding:6px 0}
+.day{height:54px;border-radius:12px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:14px;color:var(--ink)}
+.day:hover{background:var(--soft)}
+.day.today{color:#3C5BC4;font-weight:700}
+.day.sel{background:var(--ink);color:#fff;font-weight:700}
+.day.empty{visibility:hidden}
+.dots{display:flex;gap:2px;height:5px}
+.dots i{width:5px;height:5px;border-radius:50%}
+.mark{font-size:9px;font-weight:700;padding:2px 5px;border-radius:5px;line-height:1.2;max-width:100%;white-space:nowrap}
+
+/* deadline list */
+.dl-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.dl-head b{font-size:15px}.dl-head span{font-size:12px;color:var(--sub)}
+.dl-item{display:flex;align-items:center;gap:12px;padding:6px 0}
+.dbadge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;min-width:44px;text-align:center}
+.dl-item .t{flex:1}.dl-item .t b{display:block;font-size:14px}.dl-item .t small{font-size:12px;color:var(--sub)}
+.dl-item .d{width:8px;height:8px;border-radius:50%}
+.empty-msg{color:var(--sub);font-size:13px;text-align:center;padding:14px 0}
+
+/* panel header */
+.ph{display:flex;justify-content:space-between;align-items:center}
+.ph h2{font-size:20px;font-weight:700}
+.ph p{font-size:13px;color:var(--sub);margin-top:4px}
+
+/* add form */
+.form{background:var(--form);border:1px solid var(--line);border-radius:14px;padding:18px;display:none;flex-direction:column;gap:14px}
+.form.open{display:flex}
+.form .inp.main-in{background:#fff;border:1.5px solid var(--ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600;border:1.5px solid transparent}
+.chip i{width:8px;height:8px;border-radius:50%}
+.chip.on{border-color:currentColor}
+.newcat input[type=color]{width:28px;height:28px;border:0;border-radius:50%;padding:0;background:none;cursor:pointer}
+.newcat input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.newcat input[type=color]::-webkit-color-swatch{border:0;border-radius:50%}
+.newcat .inp{width:150px;padding:8px 12px;font-size:13px;background:#fff}
+.hr{height:1px;background:var(--line)}
+.toggle{display:flex;gap:8px;margin-top:8px}
+.tg{padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;background:#fff;border:1px solid var(--line)}
+.tg.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.dl-inputs{display:none;gap:12px;margin-top:10px}
+.dl-inputs.open{display:flex}
+.dl-inputs>div{flex:1}
+.dl-inputs small{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+.lbl-wrap{position:relative}
+.lbl-wrap em{position:absolute;right:12px;top:13px;font-size:12px;color:var(--sub);font-style:normal}
+.lbl-wrap .inp{border:1.5px solid var(--ink);background:#fff}
+.actions{display:flex;justify-content:flex-end;gap:8px}
+
+/* todo entries: label above, white item */
+.list{display:flex;flex-direction:column;gap:14px}
+.entry{display:flex;flex-direction:column;gap:6px}
+.entry .cat{font-size:14px;font-weight:700}
+.item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;background:#fff}
+.item:hover{background:var(--form)}
+.cb{width:18px;height:18px;border-radius:5px;border:1.5px solid;background:#fff;flex:none;padding:0;position:relative}
+.item.done .cb::after{content:"✓";position:absolute;inset:0;font-size:12px;line-height:15px;color:#fff;text-align:center;font-weight:700}
+.item .tx{flex:1;font-size:14px}
+.item.done .tx{text-decoration:line-through;opacity:.45}
+.item .due{font-size:12px;color:var(--sub)}
+.item .x{background:none;font-size:22px;color:var(--sub);line-height:1;padding:0 4px}
+.item .x:hover{color:var(--ink)}
+
+@media(max-width:900px){body{padding:20px 16px}.main{grid-template-columns:1fr}.dl-inputs{flex-direction:column}}
+</style>
+</head>
+<body>
+<h1>DoYu Todo Calendar</h1>
+
+<section class="card month">
+  <h2 id="mTitle"></h2>
+  <div class="row">
+    <input class="inp grow" id="mText" type="text" placeholder="이번 달에 꼭 하고 싶은 일을 적어보세요">
+    <div class="sel"><i id="mDot"></i><select id="mCat"></select></div>
+    <button class="btn dark" id="mAdd">추가</button>
+  </div>
+  <div class="list" id="mList"></div>
+</section>
+
+<div class="main">
+  <div class="left">
+    <section class="card">
+      <div class="cal-head">
+        <button class="nav" id="prev">‹</button><b id="ym"></b><button class="nav" id="next">›</button>
+      </div>
+      <div class="grid" id="dows"></div>
+      <div class="grid" id="days" style="margin-top:4px"></div>
+    </section>
+    <section class="card">
+      <div class="dl-head"><b>다가오는 마감</b><span id="dlCount"></span></div>
+      <div id="dlList"></div>
+    </section>
+  </div>
+
+  <section class="card panel">
+    <div class="ph">
+      <div><h2 id="dTitle"></h2><p id="dSub"></p></div>
+      <button class="btn dark" id="toggleForm">+ 할 일 추가</button>
+    </div>
+
+    <div class="form" id="form">
+      <div class="row">
+        <input class="inp main-in grow" id="text" type="text" placeholder="할 일을 입력하세요">
+        <div class="sel white"><i id="fDot"></i><select id="cat"></select></div>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="row newcat">
+        <input type="color" id="ncColor" value="#8b5cf6">
+        <input class="inp" id="ncName" type="text" placeholder="새 카테고리">
+        <button class="btn sm" id="ncAdd">+ 만들기</button>
+      </div>
+      <div class="hr"></div>
+      <div>
+        <div class="label">마감일</div>
+        <div class="toggle">
+          <button class="tg on" id="tgNone">마감일 없음</button>
+          <button class="tg" id="tgSet">마감일 설정</button>
+        </div>
+        <div class="dl-inputs" id="dlInputs">
+          <div><small>마감 날짜</small><input class="inp white" type="date" id="dDate"></div>
+          <div><small>캘린더 표시 문구 (최대 4자)</small>
+            <div class="lbl-wrap"><input class="inp" id="dLabel" type="text" maxlength="4" placeholder="예: 제출"><em id="dCnt">0/4</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="cancel">취소</button>
+        <button class="btn dark" id="add" style="padding:12px 26px">추가하기</button>
+      </div>
+    </div>
+
+    <div class="list" id="list"></div>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse=k=>{const[a,b,c]=k.split("-").map(Number);return new Date(a,b-1,c)};
+const DOW=["일","월","화","수","목","금","토"];
+const today=new Date();today.setHours(0,0,0,0);
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+
+// colors
+const mix=(hex,to,t)=>{const c=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return "#"+c.map(v=>Math.round(v*(1-t)+to*t).toString(16).padStart(2,"0")).join("")};
+const mkCat=(n,dot)=>({n,dot,bg:mix(dot,255,.78),tx:mix(dot,0,.4)});
+const DEFAULT_CATS=[
+  {n:"업무",dot:"#8FAEFF",bg:"#E3EBFF",tx:"#3C5BC4"},
+  {n:"개인",dot:"#FF9DB5",bg:"#FFE4EB",tx:"#C24468"},
+  {n:"공부",dot:"#7DD3A8",bg:"#DDF4E8",tx:"#2A8659"},
+  {n:"운동",dot:"#FFBE5C",bg:"#FFEED2",tx:"#B26F0A"}];
+
+// state
+let uid=1;const id=()=>"t"+(uid++)+Date.now();
+let S;
+try{S=JSON.parse(localStorage.getItem("doyu-todo")||"null")}catch(e){}
+if(!S){
+  S={cats:DEFAULT_CATS,todos:[
+    {id:id(),date:key(today),text:"주간 회의 준비",cat:"업무",done:true,dl:null},
+    {id:id(),date:key(today),text:"헬스장 가기",cat:"운동",done:false,dl:null},
+    {id:id(),date:key(today),text:"엄마께 전화하기",cat:"개인",done:false,dl:null},
+    {id:id(),date:key(addDays(today,1)),text:"기획서 제출",cat:"업무",done:false,dl:{date:key(addDays(today,3)),label:"제출"}},
+    {id:id(),date:key(addDays(today,1)),text:"영어 시험",cat:"공부",done:false,dl:{date:key(addDays(today,7)),label:"시험"}}],
+    monthly:{[key(today).slice(0,7)]:[{id:id(),text:"영어 책 1권 읽기",cat:"공부",done:false}]}};
+}
+const save=()=>{try{localStorage.setItem("doyu-todo",JSON.stringify(S))}catch(e){}};
+let view=new Date(today.getFullYear(),today.getMonth(),1),sel=new Date(today);
+let fCat=S.cats[0].n,fDl=false;
+const cat=n=>S.cats.find(c=>c.n===n)||{dot:"#bbb",bg:"#eee",tx:"#666"};
+
+// entries
+function entryHTML(t,big,extra=""){
+  const c=cat(t.cat);
+  return `<div class="entry"><span class="cat" style="color:${c.tx}">${esc(t.cat)}</span>
+  <div class="item ${t.done?"done":""}" data-id="${t.id}">
+    <button class="cb" style="border-color:${c.dot};${t.done?`background:${c.dot}`:""}"></button>
+    <span class="tx">${esc(t.text)}</span>${extra}<button class="x">×</button></div></div>`;
+}
+function bindList(el,arr,after){
+  el.querySelectorAll(".item").forEach(it=>{
+    const t=arr().find(x=>x.id===it.dataset.id);
+    it.querySelector(".cb").onclick=()=>{t.done=!t.done;save();after()};
+    it.querySelector(".x").onclick=()=>{const a=arr();a.splice(a.indexOf(t),1);save();after()};
+  });
+}
+
+function render(){
+  // category selects
+  const opts=S.cats.map(c=>`<option>${esc(c.n)}</option>`).join("");
+  const mv=$("mCat").value;$("mCat").innerHTML=opts;if(S.cats.some(c=>c.n===mv))$("mCat").value=mv;
+  $("cat").innerHTML=opts;$("cat").value=fCat;
+  $("mDot").style.background=cat($("mCat").value).dot;$("fDot").style.background=cat(fCat).dot;
+  $("chips").innerHTML=S.cats.map(c=>`<button class="chip ${c.n===fCat?"on":""}" data-n="${esc(c.n)}" style="background:${c.bg};color:${c.tx}"><i style="background:${c.dot}"></i>${esc(c.n)}</button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{fCat=b.dataset.n;render()});
+
+  // calendar
+  const mk=key(view).slice(0,7);
+  $("ym").textContent=`${view.getFullYear()}년 ${view.getMonth()+1}월`;
+  $("mTitle").textContent=`${view.getMonth()+1}월 할 일`;
+  $("dows").innerHTML=DOW.map(d=>`<div class="dow">${d}</div>`).join("");
+  const first=view.getDay(),len=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+  let h="";for(let i=0;i<first;i++)h+=`<div class="day empty"></div>`;
+  for(let d=1;d<=len;d++){
+    const dt=new Date(view.getFullYear(),view.getMonth(),d),k=key(dt);
+    const due=S.todos.find(t=>t.dl&&t.dl.date===k&&!t.done)||S.todos.find(t=>t.dl&&t.dl.date===k);
+    let sub;
+    if(due&&due.dl.label){const c=cat(due.cat);sub=`<span class="mark" style="background:${c.bg};color:${c.tx}">${esc(due.dl.label)}</span>`}
+    else{const cs=[...new Set(S.todos.filter(t=>t.date===k).map(t=>t.cat))].slice(0,4);
+      sub=`<span class="dots">${cs.map(n=>`<i style="background:${k===key(sel)?"#fff":cat(n).dot}"></i>`).join("")}</span>`}
+    h+=`<button class="day ${k===key(today)?"today":""} ${k===key(sel)?"sel":""}" data-d="${d}">${d}${sub}</button>`;
+  }
+  $("days").innerHTML=h;
+  $("days").querySelectorAll(".day:not(.empty)").forEach(b=>b.onclick=()=>{sel=new Date(view.getFullYear(),view.getMonth(),+b.dataset.d);
+    if(fDl&&!$("dDate").dataset.touched)$("dDate").value=key(sel);render()});
+
+  // deadlines
+  const dls=S.todos.filter(t=>t.dl&&!t.done).sort((a,b)=>a.dl.date.localeCompare(b.dl.date));
+  $("dlCount").textContent=dls.length+"개";
+  $("dlList").innerHTML=dls.length?dls.map(t=>{
+    const c=cat(t.cat),diff=Math.round((parse(t.dl.date)-today)/864e5),dd=parse(t.dl.date);
+    const b=diff===0?"D-day":diff>0?"D-"+diff:"D+"+(-diff);
+    return `<div class="dl-item"><span class="dbadge" style="background:${c.bg};color:${c.tx}">${b}</span>
+    <div class="t"><b>${esc(t.text)}</b><small>${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]})</small></div><span class="d" style="background:${c.dot}"></span></div>`}).join(""):`<div class="empty-msg">등록된 마감이 없어요</div>`;
+
+  // day panel
+  const list=S.todos.filter(t=>t.date===key(sel));
+  $("dTitle").textContent=`${sel.getMonth()+1}월 ${sel.getDate()}일 ${DOW[sel.getDay()]}요일`;
+  $("dSub").textContent=`${list.filter(t=>t.done).length}/${list.length} 완료`;
+  $("list").innerHTML=list.length?list.map(t=>entryHTML(t,true,t.dl?`<span class="due">마감 ${parse(t.dl.date).getMonth()+1}/${parse(t.dl.date).getDate()}</span>`:"")).join(""):`<div class="empty-msg">이 날의 할 일이 없어요. 위의 “+ 할 일 추가”를 눌러보세요</div>`;
+  bindList($("list"),()=>S.todos,render);
+
+  // monthly
+  const ml=S.monthly[mk]||(S.monthly[mk]=[]);
+  $("mList").innerHTML=ml.map(t=>entryHTML(t)).join("");
+  bindList($("mList"),()=>S.monthly[mk],render);
+}
+
+// form
+function setDl(on){
+  fDl=on;$("tgNone").classList.toggle("on",!on);$("tgSet").classList.toggle("on",on);
+  $("dlInputs").classList.toggle("open",on);
+  if(on&&!$("dDate").value)$("dDate").value=key(sel);
+}
+function resetForm(){$("text").value="";$("dLabel").value="";$("dCnt").textContent="0/4";$("dDate").value="";delete $("dDate").dataset.touched;setDl(false)}
+function openForm(o){$("form").classList.toggle("open",o);const b=$("toggleForm");b.textContent=o?"×  닫기":"+ 할 일 추가";b.classList.toggle("dark",!o);if(o)$("text").focus()}
+$("toggleForm").onclick=()=>openForm(!$("form").classList.contains("open"));
+$("cancel").onclick=()=>{resetForm();openForm(false)};
+$("tgNone").onclick=()=>setDl(false);$("tgSet").onclick=()=>setDl(true);
+$("dDate").oninput=e=>e.target.dataset.touched=1;
+$("dLabel").oninput=e=>$("dCnt").textContent=e.target.value.length+"/4";
+$("cat").onchange=e=>{fCat=e.target.value;render()};
+$("mCat").onchange=render;
+$("add").onclick=()=>{
+  const text=$("text").value.trim();if(!text){$("text").focus();return}
+  let dl=null;
+  if(fDl){const d=$("dDate").value;if(!d){$("dDate").focus();return}dl={date:d,label:$("dLabel").value.trim()}}
+  S.todos.push({id:id(),date:key(sel),text,cat:fCat,done:false,dl});save();
+  if(dl){const d=parse(dl.date);view=new Date(d.getFullYear(),d.getMonth(),1)>view?view:view}
+  resetForm();render();
+};
+$("text").onkeydown=e=>{if(e.key==="Enter")$("add").click()};
+$("ncAdd").onclick=()=>{const n=$("ncName").value.trim();if(!n||S.cats.some(c=>c.n===n))return;
+  S.cats.push(mkCat(n,$("ncColor").value));fCat=n;$("ncName").value="";save();render()};
+$("mAdd").onclick=()=>{const t=$("mText").value.trim();if(!t)return;const mk=key(view).slice(0,7);
+  (S.monthly[mk]=S.monthly[mk]||[]).push({id:id(),text:t,cat:$("mCat").value,done:false});$("mText").value="";save();render()};
+$("mText").onkeydown=e=>{if(e.key==="Enter")$("mAdd").click()};
+$("prev").onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);render()};
+$("next").onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);render()};
+render();
+</script>
+</body>
+</html>

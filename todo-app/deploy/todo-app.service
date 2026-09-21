@@ -1,0 +1,31 @@
+[Unit]
+Description=DoYu Todo Calendar
+After=network.target
+
+[Service]
+Type=simple
+User=todo
+Group=todo
+WorkingDirectory=/opt/todo-app
+EnvironmentFile=/etc/todo-app.env
+ExecStart=/usr/bin/node /opt/todo-app/server.js
+Restart=always
+RestartSec=3
+
+# /var/lib/todo-app is created for the "todo" user and is the only writable path
+StateDirectory=todo-app
+
+# hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
