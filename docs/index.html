@@ -90,6 +90,18 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .chip.editing>i{width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none}
 .chip .cname{border:0;background:transparent;color:inherit;font:inherit;font-weight:600;font-size:13px;outline:none;padding:6px 0;min-width:0}
 .newcat[hidden]{display:none}
+.rp-opts{display:none;flex-direction:column;gap:12px;margin-top:10px}
+.rp-opts.open{display:flex}
+.seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;align-self:flex-start}
+.seg button{background:none;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.dowpick{display:none;gap:6px}
+.dowpick.open{display:flex}
+.dowpick button{width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:13px;font-weight:600}
+.dowpick button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.rp-hint{font-size:12px;color:var(--sub)}
+.rp-until small{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+.due.rp{color:var(--ink);background:var(--soft);padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
 .newcat{display:flex;align-items:center;gap:10px;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 5px 5px 8px;transition:.15s}
 .newcat:focus-within{border-color:var(--ink)}
 .swatch{position:relative;width:26px;height:26px;border-radius:50%;background:#1b1d21;flex:none;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7),0 0 0 1px var(--line)}
@@ -189,6 +201,24 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
           </div>
         </div>
       </div>
+      <div class="hr"></div>
+      <div>
+        <div class="label">반복</div>
+        <div class="toggle">
+          <button class="tg on" id="rpNone">반복 없음</button>
+          <button class="tg" id="rpSet">반복 설정</button>
+        </div>
+        <div class="rp-opts" id="rpOpts">
+          <div class="seg" id="rpType">
+            <button data-t="daily" class="on">매일</button>
+            <button data-t="weekly">매주</button>
+            <button data-t="monthly">매월</button>
+          </div>
+          <div class="dowpick" id="rpDays"></div>
+          <div class="rp-hint" id="rpHint"></div>
+          <div class="rp-until"><small>종료일 (선택 · 비우면 계속 반복)</small><input class="inp white" type="date" id="rpUntil"></div>
+        </div>
+      </div>
       <div class="actions">
         <button class="btn" id="cancel">취소</button>
         <button class="btn dark" id="add" style="padding:12px 26px">추가하기</button>
@@ -275,7 +305,26 @@ async function api(method,url,body){
     const cat=catOk(body.cat);let dl=null;
     if(body.dl){if(!RE_DATE.test(body.dl.date||"")||isNaN(Date.parse(body.dl.date)))throw new ApiError(400,"마감일이 올바르지 않아요");
       dl={date:body.dl.date,label:String(body.dl.label||"").trim().slice(0,4)}}
-    const t={id:d.seq++,date:body.date,text,cat,done:false,dl};d.todos.push(t);lsSave(d);return clone(t);
+    let repeat=null;
+    if(body.repeat){
+      const r=body.repeat;
+      if(dl)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
+      if(!["daily","weekly","monthly"].includes(r.type))throw new ApiError(400,"반복 종류가 올바르지 않아요");
+      let days=[];
+      if(r.type==="weekly"){
+        if(!Array.isArray(r.days))throw new ApiError(400,"반복할 요일을 선택하세요");
+        days=[...new Set(r.days)].sort();
+        if(!days.length||days.some(x=>!Number.isInteger(x)||x<0||x>6))throw new ApiError(400,"반복할 요일을 선택하세요");
+      }
+      let until=null;
+      if(r.until){
+        if(!RE_DATE.test(r.until)||isNaN(Date.parse(r.until)))throw new ApiError(400,"반복 종료일이 올바르지 않아요");
+        if(r.until<body.date)throw new ApiError(400,"종료일은 시작일 이후여야 해요");
+        until=r.until;
+      }
+      repeat={type:r.type,days,until};
+    }
+    const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[]};d.todos.push(t);lsSave(d);return clone(t);
   }
   if(method==="POST"&&p==="/api/monthly"){
     const text=need(body.text,"할 일",200);
@@ -286,7 +335,12 @@ async function api(method,url,body){
   if(method==="PATCH"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){
     const t=find(d.todos,m[1]);
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
-    if(body.done!==undefined)t.done=!!body.done;
+    if(body.done!==undefined){
+      if(t.repeat){
+        if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 완료할 날짜가 필요해요");
+        const set=new Set(t.doneDates||[]);body.done?set.add(body.date):set.delete(body.date);t.doneDates=[...set].sort();
+      }else t.done=!!body.done;
+    }
     if(body.cat!==undefined)t.cat=catOk(body.cat);
     lsSave(d);return clone(t);
   }
@@ -314,22 +368,55 @@ async function run(fn){try{await fn()}catch(e){toast(e.message);try{await reload
 // state
 let S={cats:[],todos:[],monthly:{}};
 let view=new Date(today.getFullYear(),today.getMonth(),1),sel=new Date(today);
-let fCat="",fDl=false,catEdit=false,newOpen=false;
+let fCat="",fDl=false,catEdit=false,newOpen=false,fRp=false,rpType="daily",rpDays=new Set();
 const cat=n=>S.cats.find(c=>c.n===n)||{dot:"#bbb",bg:"#eee",tx:"#666"};
 
+// ---- recurrence: a todo repeats from its start date (t.date) until r.until (optional)
+function occurs(t,k){
+  if(!t.repeat)return t.date===k;
+  if(k<t.date)return false;
+  const r=t.repeat;if(r.until&&k>r.until)return false;
+  const d=parse(k);
+  if(r.type==="daily")return true;
+  if(r.type==="weekly")return (r.days||[]).includes(d.getDay());
+  const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  return d.getDate()===Math.min(parse(t.date).getDate(),last); // 31st -> last day of shorter months
+}
+const isDone=(t,k)=>t.repeat?(t.doneDates||[]).includes(k):t.done;
+function repeatLabel(t){
+  const r=t.repeat;if(!r)return "";
+  let s=r.type==="daily"?"매일":r.type==="weekly"?"매주 "+[...(r.days||[])].sort().map(d=>DOW[d]).join("·"):"매월 "+parse(t.date).getDate()+"일";
+  if(r.until){const u=parse(r.until);s+=" ~ "+(u.getMonth()+1)+"/"+u.getDate()}
+  return s;
+}
+
 // entries
-function entryHTML(t,big,extra=""){
+// one row (checkbox, text, extras, delete)
+function itemHTML(t,extra="",done=t.done){
   const c=cat(t.cat);
-  return `<div class="entry"><span class="cat" style="color:${c.tx}">${esc(t.cat)}</span>
-  <div class="item ${t.done?"done":""}" data-id="${t.id}">
-    <button class="cb" style="border-color:${c.dot};${t.done?`background:${c.dot}`:""}"></button>
-    <span class="tx">${esc(t.text)}</span>${extra}<button class="x">×</button></div></div>`;
+  return `<div class="item ${done?"done":""}" data-id="${t.id}">
+    <button class="cb" style="border-color:${c.dot};${done?`background:${c.dot}`:""}"></button>
+    <span class="tx">${esc(t.text)}</span>${extra}<button class="x">×</button></div>`;
+}
+// rows grouped under ONE category label each, in the order of the category list
+function groupHTML(rows){
+  const by=new Map(S.cats.map(c=>[c.n,[]]));
+  rows.forEach(r=>{if(!by.has(r.t.cat))by.set(r.t.cat,[]);by.get(r.t.cat).push(r)});
+  return [...by].filter(([,a])=>a.length).map(([n,a])=>
+    `<div class="entry"><span class="cat" style="color:${cat(n).tx}">${esc(n)}</span>${a.map(r=>itemHTML(r.t,r.extra,r.done)).join("")}</div>`).join("");
 }
 function bindList(el,kind,arr,after){
+  const dk=key(sel);
   el.querySelectorAll(".item").forEach(it=>{
     const t=arr().find(x=>String(x.id)===it.dataset.id);
-    it.querySelector(".cb").onclick=()=>run(async()=>{t.done=!t.done;after();await api("PATCH",`/api/${kind}/${t.id}`,{done:t.done})});
-    it.querySelector(".x").onclick=()=>run(async()=>{const a=arr();a.splice(a.indexOf(t),1);after();await api("DELETE",`/api/${kind}/${t.id}`)});
+    it.querySelector(".cb").onclick=()=>run(async()=>{
+      if(kind==="todos"&&t.repeat){
+        const set=new Set(t.doneDates||[]),nd=!set.has(dk);nd?set.add(dk):set.delete(dk);t.doneDates=[...set];
+        after();await api("PATCH",`/api/todos/${t.id}`,{done:nd,date:dk});
+      }else{t.done=!t.done;after();await api("PATCH",`/api/${kind}/${t.id}`,{done:t.done})}
+    });
+    it.querySelector(".x").onclick=()=>run(async()=>{
+      if(kind==="todos"&&t.repeat&&!confirm("반복 일정은 전체가 삭제돼요 (지난 기록 포함). 삭제할까요?"))return;const a=arr();a.splice(a.indexOf(t),1);after();await api("DELETE",`/api/${kind}/${t.id}`)});
   });
 }
 
@@ -365,13 +452,13 @@ function render(){
     const due=S.todos.find(t=>t.dl&&t.dl.date===k&&!t.done)||S.todos.find(t=>t.dl&&t.dl.date===k);
     let sub;
     if(due&&due.dl.label){const c=cat(due.cat);sub=`<span class="mark" style="background:${c.bg};color:${c.tx}">${esc(due.dl.label)}</span>`}
-    else{const cs=[...new Set(S.todos.filter(t=>t.date===k).map(t=>t.cat))].slice(0,4);
+    else{const cs=[...new Set(S.todos.filter(t=>occurs(t,k)).map(t=>t.cat))].slice(0,4);
       sub=`<span class="dots">${cs.map(n=>`<i style="background:${k===key(sel)?"#fff":cat(n).dot}"></i>`).join("")}</span>`}
     h+=`<button class="day ${k===key(today)?"today":""} ${k===key(sel)?"sel":""}" data-d="${d}">${d}${sub}</button>`;
   }
   $("days").innerHTML=h;
   $("days").querySelectorAll(".day:not(.empty)").forEach(b=>b.onclick=()=>{sel=new Date(view.getFullYear(),view.getMonth(),+b.dataset.d);
-    if(fDl&&!$("dDate").dataset.touched)$("dDate").value=key(sel);render()});
+    if(fDl&&!$("dDate").dataset.touched)$("dDate").value=key(sel);if(fRp)renderRp();render()});
 
   // deadlines
   const dls=S.todos.filter(t=>t.dl&&!t.done).sort((a,b)=>a.dl.date.localeCompare(b.dl.date));
@@ -383,25 +470,43 @@ function render(){
     <div class="t"><b>${esc(t.text)}</b><small>${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]})</small></div><span class="d" style="background:${c.dot}"></span></div>`}).join(""):`<div class="empty-msg">등록된 마감이 없어요</div>`;
 
   // day panel
-  const list=S.todos.filter(t=>t.date===key(sel));
+  const list=S.todos.filter(t=>occurs(t,key(sel)));
   $("dTitle").textContent=`${sel.getMonth()+1}월 ${sel.getDate()}일 ${DOW[sel.getDay()]}요일`;
-  $("dSub").textContent=`${list.filter(t=>t.done).length}/${list.length} 완료`;
-  $("list").innerHTML=list.length?list.map(t=>entryHTML(t,true,t.dl?`<span class="due">마감 ${parse(t.dl.date).getMonth()+1}/${parse(t.dl.date).getDate()}</span>`:"")).join(""):`<div class="empty-msg">이 날의 할 일이 없어요. 위의 “+ 할 일 추가”를 눌러보세요</div>`;
+  $("dSub").textContent=`${list.filter(t=>isDone(t,key(sel))).length}/${list.length} 완료`;
+  $("list").innerHTML=list.length?groupHTML(list.map(t=>({t,extra:t.repeat?`<span class="due rp">↻ ${esc(repeatLabel(t))}</span>`:t.dl?`<span class="due">마감 ${parse(t.dl.date).getMonth()+1}/${parse(t.dl.date).getDate()}</span>`:"",done:isDone(t,key(sel))}))):`<div class="empty-msg">이 날의 할 일이 없어요. 위의 “+ 할 일 추가”를 눌러보세요</div>`;
   bindList($("list"),"todos",()=>S.todos,render);
 
   // monthly
   const ml=S.monthly[mk]||(S.monthly[mk]=[]);
-  $("mList").innerHTML=ml.map(t=>entryHTML(t)).join("");
+  $("mList").innerHTML=groupHTML(ml.map(t=>({t,extra:"",done:t.done})));
   bindList($("mList"),"monthly",()=>S.monthly[mk],render);
 }
 
 // form
 function setDl(on){
+  if(on&&fRp)setRp(false);
   fDl=on;$("tgNone").classList.toggle("on",!on);$("tgSet").classList.toggle("on",on);
   $("dlInputs").classList.toggle("open",on);
   if(on&&!$("dDate").value)$("dDate").value=key(sel);
 }
-function resetForm(){$("text").value="";$("dLabel").value="";$("dCnt").textContent="0/4";$("dDate").value="";delete $("dDate").dataset.touched;setDl(false)}
+function renderRp(){
+  $("rpNone").classList.toggle("on",!fRp);$("rpSet").classList.toggle("on",fRp);
+  $("rpOpts").classList.toggle("open",fRp);
+  $("rpType").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.t===rpType));
+  const dp=$("rpDays");dp.classList.toggle("open",fRp&&rpType==="weekly");
+  dp.innerHTML=DOW.map((d,i)=>`<button data-d="${i}" class="${rpDays.has(i)?"on":""}">${d}</button>`).join("");
+  dp.querySelectorAll("button").forEach(b=>b.onclick=()=>{const i=+b.dataset.d;rpDays.has(i)?rpDays.delete(i):rpDays.add(i);renderRp()});
+  $("rpHint").textContent=rpType==="daily"?`${sel.getMonth()+1}월 ${sel.getDate()}일부터 매일 반복돼요`
+    :rpType==="weekly"?(rpDays.size?"선택한 요일마다 반복돼요":"반복할 요일을 선택하세요")
+    :`매월 ${sel.getDate()}일에 반복돼요 (31일 → 짧은 달은 말일)`;
+}
+function setRp(on){
+  if(on&&fDl)setDl(false);
+  fRp=on;if(on&&!rpDays.size)rpDays.add(sel.getDay());renderRp();
+}
+$("rpNone").onclick=()=>setRp(false);$("rpSet").onclick=()=>setRp(true);
+$("rpType").querySelectorAll("button").forEach(b=>b.onclick=()=>{rpType=b.dataset.t;renderRp()});
+function resetForm(){fRp=false;rpType="daily";rpDays=new Set();$("rpUntil").value="";renderRp();$("text").value="";$("dLabel").value="";$("dCnt").textContent="0/4";$("dDate").value="";delete $("dDate").dataset.touched;setDl(false)}
 function openForm(o){$("form").classList.toggle("open",o);const b=$("toggleForm");b.textContent=o?"×  닫기":"+ 할 일 추가";b.classList.toggle("dark",!o);if(o)$("text").focus()}
 $("toggleForm").onclick=()=>openForm(!$("form").classList.contains("open"));
 $("cancel").onclick=()=>{resetForm();openForm(false)};
@@ -413,7 +518,14 @@ $("add").onclick=()=>run(async()=>{
   const text=$("text").value.trim();if(!text){$("text").focus();return}
   let dl=null;
   if(fDl){const d=$("dDate").value;if(!d){$("dDate").focus();return}dl={date:d,label:$("dLabel").value.trim()}}
-  const t=await api("POST","/api/todos",{date:key(sel),text,cat:fCat,dl});
+  let repeat=null;
+  if(fRp){
+    if(rpType==="weekly"&&!rpDays.size){toast("반복할 요일을 선택하세요");return}
+    const until=$("rpUntil").value||null;
+    if(until&&until<key(sel)){toast("종료일은 시작일 이후여야 해요");return}
+    repeat={type:rpType,days:rpType==="weekly"?[...rpDays].sort():[],until};
+  }
+  const t=await api("POST","/api/todos",{date:key(sel),text,cat:fCat,dl,repeat});
   S.todos.push(t);resetForm();render();
 });
 $("text").onkeydown=e=>{if(e.key==="Enter")$("add").click()};

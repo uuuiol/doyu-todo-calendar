@@ -66,7 +66,26 @@ async function api(method,url,body){
     const cat=catOk(body.cat);let dl=null;
     if(body.dl){if(!RE_DATE.test(body.dl.date||"")||isNaN(Date.parse(body.dl.date)))throw new ApiError(400,"마감일이 올바르지 않아요");
       dl={date:body.dl.date,label:String(body.dl.label||"").trim().slice(0,4)}}
-    const t={id:d.seq++,date:body.date,text,cat,done:false,dl};d.todos.push(t);lsSave(d);return clone(t);
+    let repeat=null;
+    if(body.repeat){
+      const r=body.repeat;
+      if(dl)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
+      if(!["daily","weekly","monthly"].includes(r.type))throw new ApiError(400,"반복 종류가 올바르지 않아요");
+      let days=[];
+      if(r.type==="weekly"){
+        if(!Array.isArray(r.days))throw new ApiError(400,"반복할 요일을 선택하세요");
+        days=[...new Set(r.days)].sort();
+        if(!days.length||days.some(x=>!Number.isInteger(x)||x<0||x>6))throw new ApiError(400,"반복할 요일을 선택하세요");
+      }
+      let until=null;
+      if(r.until){
+        if(!RE_DATE.test(r.until)||isNaN(Date.parse(r.until)))throw new ApiError(400,"반복 종료일이 올바르지 않아요");
+        if(r.until<body.date)throw new ApiError(400,"종료일은 시작일 이후여야 해요");
+        until=r.until;
+      }
+      repeat={type:r.type,days,until};
+    }
+    const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[]};d.todos.push(t);lsSave(d);return clone(t);
   }
   if(method==="POST"&&p==="/api/monthly"){
     const text=need(body.text,"할 일",200);
@@ -77,7 +96,12 @@ async function api(method,url,body){
   if(method==="PATCH"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){
     const t=find(d.todos,m[1]);
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
-    if(body.done!==undefined)t.done=!!body.done;
+    if(body.done!==undefined){
+      if(t.repeat){
+        if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 완료할 날짜가 필요해요");
+        const set=new Set(t.doneDates||[]);body.done?set.add(body.date):set.delete(body.date);t.doneDates=[...set].sort();
+      }else t.done=!!body.done;
+    }
     if(body.cat!==undefined)t.cat=catOk(body.cat);
     lsSave(d);return clone(t);
   }
