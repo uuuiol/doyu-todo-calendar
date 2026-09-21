@@ -75,11 +75,21 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .form .inp.main-in{background:#fff;border:1.5px solid var(--ink)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
 .chip{display:flex;align-items:center;border-radius:999px;font-size:13px;font-weight:600;border:1.5px solid transparent;transition:.15s}
-.chip .cn{display:flex;align-items:center;gap:6px;background:none;color:inherit;font-weight:600;font-size:13px;padding:6px 4px 6px 12px}
+.chip .cn{display:flex;align-items:center;gap:6px;background:none;color:inherit;font-weight:600;font-size:13px;padding:6px 12px}
 .chip .cn i{width:8px;height:8px;border-radius:50%}
 .chip .cx{background:none;color:inherit;opacity:.35;font-size:15px;line-height:1;padding:6px 10px 6px 4px}
 .chip .cx:hover{opacity:1}
 .chip.on{border-color:currentColor}
+.cat-head{display:flex;justify-content:space-between;align-items:center;min-height:26px}
+.edit-btn{background:none;color:var(--sub);font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px}
+.edit-btn:hover{background:var(--soft);color:var(--ink)}
+.edit-btn.on{background:var(--ink);color:#fff}
+.chip.add{background:none;border:1.5px dashed var(--line2);color:var(--sub);padding:6px 12px;font-size:13px;font-weight:600}
+.chip.add:hover{color:var(--ink);border-color:var(--ink)}
+.chip.editing{padding-left:12px;border-style:dashed;border-color:currentColor}
+.chip.editing>i{width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none}
+.chip .cname{border:0;background:transparent;color:inherit;font:inherit;font-weight:600;font-size:13px;outline:none;padding:6px 0;min-width:0}
+.newcat[hidden]{display:none}
 .newcat{display:flex;align-items:center;gap:10px;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 5px 5px 8px;transition:.15s}
 .newcat:focus-within{border-color:var(--ink)}
 .swatch{position:relative;width:26px;height:26px;border-radius:50%;background:#8b5cf6;flex:none;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7),0 0 0 1px var(--line)}
@@ -157,9 +167,9 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
     <div class="form" id="form">
       <input class="inp main-in" id="text" type="text" placeholder="할 일을 입력하세요">
       <div>
-        <div class="label">카테고리</div>
+        <div class="cat-head"><span class="label">카테고리</span><button class="edit-btn" id="catEdit">✎ 수정</button></div>
         <div class="chips" id="chips"></div>
-        <div class="newcat" id="newcat">
+        <div class="newcat" id="newcat" hidden>
           <label class="swatch" id="ncSwatch" title="색상 선택"><input type="color" id="ncColor" value="#8b5cf6"></label>
           <input id="ncName" type="text" placeholder="새 카테고리 이름" maxlength="12" autocomplete="off">
           <button id="ncAdd" disabled>추가</button>
@@ -237,6 +247,17 @@ async function api(method,url,body){
     if(hasCat(n))throw new ApiError(409,"이미 있는 카테고리예요");
     const c={n,dot:body.dot,bg:body.bg,tx:body.tx};d.cats.push(c);lsSave(d);return clone(c);
   }
+  if(method==="PATCH"&&(m=p.match(/^\/api\/categories\/([^/]+)$/))){
+    const old=decodeURIComponent(m[1]),c=d.cats.find(x=>x.n===old);
+    if(!c)throw new ApiError(404,"카테고리를 찾을 수 없어요");
+    const n=need(body.name,"카테고리 이름",12);
+    if(n!==old){
+      if(hasCat(n))throw new ApiError(409,"이미 있는 카테고리예요");
+      c.n=n;d.todos.forEach(t=>{if(t.cat===old)t.cat=n});
+      for(const k of Object.keys(d.monthly))d.monthly[k].forEach(t=>{if(t.cat===old)t.cat=n});
+    }
+    lsSave(d);return clone(c);
+  }
   if(method==="DELETE"&&(m=p.match(/^\/api\/categories\/([^/]+)$/))){
     const n=decodeURIComponent(m[1]);
     if(!hasCat(n))throw new ApiError(404,"카테고리를 찾을 수 없어요");
@@ -293,7 +314,7 @@ async function run(fn){try{await fn()}catch(e){toast(e.message);try{await reload
 // state
 let S={cats:[],todos:[],monthly:{}};
 let view=new Date(today.getFullYear(),today.getMonth(),1),sel=new Date(today);
-let fCat="",fDl=false;
+let fCat="",fDl=false,catEdit=false,newOpen=false;
 const cat=n=>S.cats.find(c=>c.n===n)||{dot:"#bbb",bg:"#eee",tx:"#666"};
 
 // entries
@@ -317,9 +338,20 @@ function render(){
   const opts=S.cats.map(c=>`<option>${esc(c.n)}</option>`).join("");
   const mv=$("mCat").value;$("mCat").innerHTML=opts;if(S.cats.some(c=>c.n===mv))$("mCat").value=mv;
   $("mDot").style.background=cat($("mCat").value).dot;
-  $("chips").innerHTML=S.cats.map(c=>`<div class="chip ${c.n===fCat?"on":""}" style="background:${c.bg};color:${c.tx}"><button class="cn" data-n="${esc(c.n)}"><i style="background:${c.dot}"></i>${esc(c.n)}</button><button class="cx" data-n="${esc(c.n)}" title="카테고리 삭제" aria-label="${esc(c.n)} 삭제">×</button></div>`).join("");
+  $("chips").innerHTML=S.cats.map(c=>catEdit
+    ?`<div class="chip editing" style="background:${c.bg};color:${c.tx}"><i style="background:${c.dot}"></i><input class="cname" data-n="${esc(c.n)}" value="${esc(c.n)}" maxlength="12" size="${Math.max(3,c.n.length+1)}" aria-label="카테고리 이름"><button class="cx" data-n="${esc(c.n)}" title="카테고리 삭제" aria-label="${esc(c.n)} 삭제">×</button></div>`
+    :`<div class="chip ${c.n===fCat?"on":""}" style="background:${c.bg};color:${c.tx}"><button class="cn" data-n="${esc(c.n)}"><i style="background:${c.dot}"></i>${esc(c.n)}</button></div>`).join("")
+    +(catEdit?"":`<button class="chip add" id="addChip">+ 추가</button>`);
   $("chips").querySelectorAll(".cn").forEach(b=>b.onclick=()=>{fCat=b.dataset.n;render()});
   $("chips").querySelectorAll(".cx").forEach(b=>b.onclick=()=>deleteCat(b.dataset.n));
+  $("chips").querySelectorAll(".cname").forEach(inp=>{
+    inp.oninput=()=>{inp.size=Math.max(3,inp.value.length+1)};
+    inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}else if(e.key==="Escape"){inp.value=inp.dataset.n;inp.blur()}};
+    inp.onchange=()=>renameCat(inp.dataset.n,inp.value.trim());
+  });
+  const ab=$("addChip");if(ab)ab.onclick=()=>{newOpen=!newOpen;render();if(newOpen)$("ncName").focus()};
+  $("catEdit").textContent=catEdit?"완료":"✎ 수정";$("catEdit").classList.toggle("on",catEdit);
+  $("newcat").hidden=catEdit||!newOpen;
 
   // calendar
   const mk=key(view).slice(0,7);
@@ -385,6 +417,12 @@ $("add").onclick=()=>run(async()=>{
   S.todos.push(t);resetForm();render();
 });
 $("text").onkeydown=e=>{if(e.key==="Enter")$("add").click()};
+async function renameCat(old,n){
+  if(!n||n===old){render();return}
+  if(S.cats.some(c=>c.n===n)){toast("이미 있는 카테고리예요");render();return}
+  await run(async()=>{await api("PATCH",`/api/categories/${encodeURIComponent(old)}`,{name:n});if(fCat===old)fCat=n;await reload()});
+}
+$("catEdit").onclick=()=>{catEdit=!catEdit;if(catEdit)newOpen=false;render()};
 async function deleteCat(n){
   if(S.cats.length<=1){toast("카테고리는 최소 1개 있어야 해요");return}
   const cnt=S.todos.filter(t=>t.cat===n).length+Object.values(S.monthly).flat().filter(t=>t.cat===n).length;
@@ -393,11 +431,11 @@ async function deleteCat(n){
 }
 $("ncColor").oninput=e=>$("ncSwatch").style.background=e.target.value;
 $("ncName").oninput=e=>$("ncAdd").disabled=!e.target.value.trim();
-$("ncName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("ncAdd").click()}};
+$("ncName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("ncAdd").click()}else if(e.key==="Escape"){newOpen=false;render()}};
 $("ncAdd").onclick=()=>run(async()=>{const n=$("ncName").value.trim();if(!n)return;
   if(S.cats.some(c=>c.n===n)){toast("이미 있는 카테고리예요");return}
   const c=await api("POST","/api/categories",{name:n,...(({dot,bg,tx})=>({dot,bg,tx}))(mkCat(n,$("ncColor").value))});
-  S.cats.push(c);fCat=c.n;$("ncName").value="";$("ncAdd").disabled=true;render()});
+  S.cats.push(c);fCat=c.n;$("ncName").value="";$("ncAdd").disabled=true;newOpen=false;render()});
 $("mAdd").onclick=()=>run(async()=>{const t=$("mText").value.trim();if(!t)return;const mk=key(view).slice(0,7);
   const m=await api("POST","/api/monthly",{month:mk,text:t,cat:$("mCat").value});
   (S.monthly[mk]=S.monthly[mk]||[]).push(m);$("mText").value="";render()});

@@ -92,6 +92,20 @@ route("POST", "/api/categories", (_, { body }) => {
   return [201, { n, dot: body.dot, bg: body.bg, tx: body.tx }];
 });
 
+// Rename: todos/monthly follow automatically (FOREIGN KEY ... ON UPDATE CASCADE).
+route("PATCH", "/api/categories/([^/]+)", ([, raw], { body }) => {
+  let old;
+  try { old = decodeURIComponent(raw); } catch { throw bad("카테고리 이름이 올바르지 않아요"); }
+  const row = db.prepare("SELECT name n, dot, bg, tx FROM categories WHERE name=?").get(old);
+  if (!row) throw new HttpError(404, "카테고리를 찾을 수 없어요");
+  const n = str(body.name, "카테고리 이름", 12);
+  if (n !== old) {
+    if (db.prepare("SELECT 1 FROM categories WHERE name=?").get(n)) throw new HttpError(409, "이미 있는 카테고리예요");
+    db.prepare("UPDATE categories SET name=? WHERE name=?").run(n, old);
+  }
+  return db.prepare("SELECT name n, dot, bg, tx FROM categories WHERE name=?").get(n);
+});
+
 // Deleting a category that is still in use needs ?cascade=1 (removes its todos too).
 route("DELETE", "/api/categories/([^/]+)", ([, raw], { query }) => {
   let name;

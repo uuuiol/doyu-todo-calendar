@@ -38,6 +38,17 @@ async function api(method,url,body){
     if(hasCat(n))throw new ApiError(409,"이미 있는 카테고리예요");
     const c={n,dot:body.dot,bg:body.bg,tx:body.tx};d.cats.push(c);lsSave(d);return clone(c);
   }
+  if(method==="PATCH"&&(m=p.match(/^\/api\/categories\/([^/]+)$/))){
+    const old=decodeURIComponent(m[1]),c=d.cats.find(x=>x.n===old);
+    if(!c)throw new ApiError(404,"카테고리를 찾을 수 없어요");
+    const n=need(body.name,"카테고리 이름",12);
+    if(n!==old){
+      if(hasCat(n))throw new ApiError(409,"이미 있는 카테고리예요");
+      c.n=n;d.todos.forEach(t=>{if(t.cat===old)t.cat=n});
+      for(const k of Object.keys(d.monthly))d.monthly[k].forEach(t=>{if(t.cat===old)t.cat=n});
+    }
+    lsSave(d);return clone(c);
+  }
   if(method==="DELETE"&&(m=p.match(/^\/api\/categories\/([^/]+)$/))){
     const n=decodeURIComponent(m[1]);
     if(!hasCat(n))throw new ApiError(404,"카테고리를 찾을 수 없어요");
