@@ -49,6 +49,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS todo_done (
   date TEXT NOT NULL,
   PRIMARY KEY (todo_id, date)
 )`);
+db.exec(`CREATE TABLE IF NOT EXISTS todo_skip (
+  todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  PRIMARY KEY (todo_id, date)
+)`);
 if (db.prepare("SELECT COUNT(*) c FROM categories").get().c === 0) {
   const ins = db.prepare("INSERT INTO categories(name,dot,bg,tx) VALUES (?,?,?,?)");
   [["업무", "#8FAEFF", "#E3EBFF", "#3C5BC4"], ["개인", "#FF9DB5", "#FFE4EB", "#C24468"],
@@ -80,6 +85,8 @@ const todoOut = (r) => ({
     : null,
   // recurring todos are completed per date, not as a whole
   doneDates: r.repeat_type ? db.prepare("SELECT date FROM todo_done WHERE todo_id=? ORDER BY date").all(r.id).map((x) => x.date) : [],
+  // days of a recurring todo that were skipped ("이 날만 건너뛰기")
+  skipDates: r.repeat_type ? db.prepare("SELECT date FROM todo_skip WHERE todo_id=? ORDER BY date").all(r.id).map((x) => x.date) : [],
 });
 const monthlyOut = (r) => ({ id: r.id, month: r.month, text: r.text, cat: r.cat, done: !!r.done });
 
@@ -174,6 +181,12 @@ route("PATCH", "/api/todos/(\\d+)", ([, id], { body }) => {
   const row = db.prepare("SELECT * FROM todos WHERE id=?").get(id);
   if (!row) throw new HttpError(404, "할 일을 찾을 수 없어요");
   const text = body.text !== undefined ? str(body.text, "할 일", 200) : row.text;
+  if (body.skip !== undefined) {
+    if (!row.repeat_type) throw bad("반복 일정만 건너뛸 수 있어요");
+    if (!validDate(body.date)) throw bad("건너뛸 날짜가 필요해요");
+    if (body.skip) db.prepare("INSERT OR IGNORE INTO todo_skip(todo_id,date) VALUES (?,?)").run(id, body.date);
+    else db.prepare("DELETE FROM todo_skip WHERE todo_id=? AND date=?").run(id, body.date);
+  }
   let done = row.done;
   if (body.done !== undefined) {
     if (row.repeat_type) {

@@ -90,6 +90,13 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 .chip.editing>i{width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none}
 .chip .cname{border:0;background:transparent;color:inherit;font:inherit;font-weight:600;font-size:13px;outline:none;padding:6px 0;min-width:0}
 .newcat[hidden]{display:none}
+#toast.act{pointer-events:auto}
+#toast button{background:none;color:#fff;font-size:14px;font-weight:700;text-decoration:underline;margin-left:14px}
+.item{flex-wrap:wrap}
+.rp-menu{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px 30px}
+.rp-menu button{background:var(--soft);font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px}
+.rp-menu button:hover{background:var(--line)}
+.rp-menu .danger{color:#C24468;background:#FFE4EB}
 .rp-opts{display:none;flex-direction:column;gap:12px;margin-top:10px}
 .rp-opts.open{display:flex}
 .seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;align-self:flex-start}
@@ -125,9 +132,9 @@ h1{font-size:24px;font-weight:700;margin-bottom:24px}
 
 /* todo entries: label above, white item */
 .list{display:flex;flex-direction:column;gap:14px}
-.entry{display:flex;flex-direction:column;gap:6px}
-.entry .cat{font-size:14px;font-weight:700}
-.item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;background:#fff}
+.entry{display:flex;flex-direction:column;gap:1px}
+.entry .cat{font-size:14px;font-weight:700;margin-bottom:5px}
+.item{display:flex;align-items:center;gap:12px;padding:7px 14px;border-radius:12px;background:#fff}
 .item:hover{background:var(--form)}
 .cb{width:18px;height:18px;border-radius:5px;border:1.5px solid;background:#fff;flex:none;padding:0;position:relative}
 .item.done .cb::after{content:"✓";position:absolute;inset:0;font-size:12px;line-height:15px;color:#fff;text-align:center;font-weight:700}
@@ -253,7 +260,12 @@ async function api(method,url,body){
   return d;
 }
 let toastT;
-function toast(msg){let t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),2600)}
+function toast(msg,action){
+  const t=$("toast");t.textContent=msg;
+  if(action){const b=document.createElement("button");b.textContent=action.label;b.onclick=()=>{t.classList.remove("show");action.fn()};t.append(b)}
+  t.classList.toggle("act",!!action);t.classList.add("show");
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),action?6000:2600);
+}
 async function reload(){S=await api("GET","/api/state");if(!S.cats.some(c=>c.n===fCat))fCat=S.cats[0]&&S.cats[0].n;render()}
 async function run(fn){try{await fn()}catch(e){toast(e.message);try{await reload()}catch(_){}}}
 
@@ -266,7 +278,7 @@ const cat=n=>S.cats.find(c=>c.n===n)||{dot:"#bbb",bg:"#eee",tx:"#666"};
 // ---- recurrence: a todo repeats from its start date (t.date) until r.until (optional)
 function occurs(t,k){
   if(!t.repeat)return t.date===k;
-  if(k<t.date)return false;
+  if(k<t.date||(t.skipDates||[]).includes(k))return false;
   const r=t.repeat;if(r.until&&k>r.until)return false;
   const d=parse(k);
   if(r.type==="daily")return true;
@@ -307,8 +319,27 @@ function bindList(el,kind,arr,after){
         after();await api("PATCH",`/api/todos/${t.id}`,{done:nd,date:dk});
       }else{t.done=!t.done;after();await api("PATCH",`/api/${kind}/${t.id}`,{done:t.done})}
     });
-    it.querySelector(".x").onclick=()=>run(async()=>{
-      if(kind==="todos"&&t.repeat&&!confirm("반복 일정은 전체가 삭제돼요 (지난 기록 포함). 삭제할까요?"))return;const a=arr();a.splice(a.indexOf(t),1);after();await api("DELETE",`/api/${kind}/${t.id}`)});
+    it.querySelector(".x").onclick=()=>{
+      if(kind==="todos"&&t.repeat){
+        const open=it.querySelector(".rp-menu");
+        if(open){open.remove();return}
+        const m=document.createElement("div");m.className="rp-menu";
+        m.innerHTML='<button data-a="skip">이 날만 건너뛰기</button><button data-a="all" class="danger">반복 전체 삭제</button><button data-a="cancel">취소</button>';
+        it.append(m);
+        m.querySelector('[data-a="cancel"]').onclick=()=>m.remove();
+        m.querySelector('[data-a="skip"]').onclick=()=>run(async()=>{
+          t.skipDates=[...(t.skipDates||[]),dk];after();
+          toast("이 날만 건너뛰었어요",{label:"되돌리기",fn:()=>run(async()=>{
+            t.skipDates=(t.skipDates||[]).filter(d=>d!==dk);after();
+            await api("PATCH",`/api/todos/${t.id}`,{skip:false,date:dk});
+          })});
+          await api("PATCH",`/api/todos/${t.id}`,{skip:true,date:dk});
+        });
+        m.querySelector('[data-a="all"]').onclick=()=>run(async()=>{const a=arr();a.splice(a.indexOf(t),1);after();await api("DELETE",`/api/todos/${t.id}`)});
+        return;
+      }
+      run(async()=>{const a=arr();a.splice(a.indexOf(t),1);after();await api("DELETE",`/api/${kind}/${t.id}`)});
+    };
   });
 }
 

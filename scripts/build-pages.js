@@ -85,7 +85,7 @@ async function api(method,url,body){
       }
       repeat={type:r.type,days,until};
     }
-    const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[]};d.todos.push(t);lsSave(d);return clone(t);
+    const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[],skipDates:[]};d.todos.push(t);lsSave(d);return clone(t);
   }
   if(method==="POST"&&p==="/api/monthly"){
     const text=need(body.text,"할 일",200);
@@ -96,6 +96,11 @@ async function api(method,url,body){
   if(method==="PATCH"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){
     const t=find(d.todos,m[1]);
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
+    if(body.skip!==undefined){
+      if(!t.repeat)throw new ApiError(400,"반복 일정만 건너뛸 수 있어요");
+      if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"건너뛸 날짜가 필요해요");
+      const set=new Set(t.skipDates||[]);body.skip?set.add(body.date):set.delete(body.date);t.skipDates=[...set].sort();
+    }
     if(body.done!==undefined){
       if(t.repeat){
         if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 완료할 날짜가 필요해요");
