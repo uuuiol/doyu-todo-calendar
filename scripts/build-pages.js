@@ -28,7 +28,7 @@ function lsLoad(){
       return d;
     }
   }catch(e){}
-  return {cats:DEF_CATS.map(c=>({...c})),todos:[],monthly:{},seq:1};
+  return {cats:DEF_CATS.map(c=>({...c})),todos:[],monthly:{},seq:1,motto:""};
 }
 function lsSave(d){
   try{localStorage.setItem(LS_KEY,JSON.stringify(d))}
@@ -66,7 +66,12 @@ async function api(method,url,body){
   const hasCat=n=>d.cats.some(c=>c.n===n);
   const catOk=n=>{if(!hasCat(n))throw new ApiError(400,"존재하지 않는 카테고리예요");return n};
   const find=(arr,id)=>{const t=arr.find(x=>x.id===+id);if(!t)throw new ApiError(404,"할 일을 찾을 수 없어요");return t};
-  if(method==="GET"&&p==="/api/state")return clone({cats:d.cats,todos:d.todos,monthly:d.monthly});
+  if(method==="GET"&&p==="/api/state")return clone({cats:d.cats,todos:d.todos,monthly:d.monthly,motto:d.motto||""});
+  if(method==="PUT"&&p==="/api/motto"){
+    const text=typeof body.text==="string"?body.text.trim():"";
+    if(text.length>200)throw new ApiError(400,"문구는 200자 이하여야 해요");
+    d.motto=text;lsSave(d);return {text};
+  }
 
   if(method==="POST"&&p==="/api/categories"){
     const n=need(body.name,"카테고리 이름",12);

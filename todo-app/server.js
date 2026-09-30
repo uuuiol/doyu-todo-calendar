@@ -40,6 +40,10 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_monthly_month ON monthly(month);
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 // migration: "done" used to be a boolean (1 = done); it is now tri-state (0=todo,1=progress,2=done).
 // Old DBs get a one-time remap so previously-done rows land on 2, not on the new "progress" value 1.
@@ -112,11 +116,21 @@ const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" 
 route("GET", "/api/state", () => {
   const monthly = {};
   db.prepare("SELECT * FROM monthly ORDER BY id").all().forEach((r) => (monthly[r.month] ||= []).push(monthlyOut(r)));
+  const mottoRow = db.prepare("SELECT value FROM settings WHERE key='motto'").get();
   return {
     cats: db.prepare("SELECT name n, dot, bg, tx FROM categories ORDER BY id").all(),
     todos: db.prepare("SELECT * FROM todos ORDER BY date, id").all().map(todoOut),
     monthly,
+    motto: mottoRow ? mottoRow.value : "",
   };
+});
+
+// Personal motto/quote shown next to the title. Empty text clears it.
+route("PUT", "/api/motto", (_, { body }) => {
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (text.length > 200) throw bad("문구는 200자 이하여야 해요");
+  db.prepare("INSERT INTO settings(key,value) VALUES ('motto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(text);
+  return { text };
 });
 
 route("POST", "/api/categories", (_, { body }) => {
@@ -314,7 +328,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith("/api/")) {
       const r = routes.find((x) => x.method === req.method && x.re.test(pathname));
       if (!r) return sendJson(res, routes.some((x) => x.re.test(pathname)) ? 405 : 404, { error: "not found" });
-      const body = req.method === "POST" || req.method === "PATCH" ? await readBody(req) : {};
+      const body = ["POST", "PATCH", "PUT"].includes(req.method) ? await readBody(req) : {};
       const out = await r.fn(pathname.match(r.re), { body, query });
       return Array.isArray(out) ? sendJson(res, out[0], out[1]) : sendJson(res, 200, out);
     }
