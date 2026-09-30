@@ -14,7 +14,20 @@ const DEF_CATS=[
   {n:"운동",dot:"#FFBE5C",bg:"#FFEED2",tx:"#B26F0A"}];
 class ApiError extends Error{constructor(status,msg,data){super(msg);this.status=status;this.data=data||{}}}
 function lsLoad(){
-  try{const d=JSON.parse(localStorage.getItem(LS_KEY));if(d&&Array.isArray(d.cats))return d}catch(e){}
+  try{
+    const d=JSON.parse(localStorage.getItem(LS_KEY));
+    if(d&&Array.isArray(d.cats)){
+      let changed=false;
+      const fix=t=>{
+        if(typeof t.done==="boolean"){t.done=t.done?2:0;changed=true}
+        if(!Array.isArray(t.progressDates)){t.progressDates=[];changed=true}
+      };
+      (d.todos||[]).forEach(fix);
+      Object.values(d.monthly||{}).flat().forEach(fix);
+      if(changed)lsSave(d);
+      return d;
+    }
+  }catch(e){}
   return {cats:DEF_CATS.map(c=>({...c})),todos:[],monthly:{},seq:1};
 }
 function lsSave(d){
@@ -87,12 +100,12 @@ async function api(method,url,body){
     const text=need(body.text,"할 일",200);
     if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"날짜가 올바르지 않아요");
     const cat=catOk(body.cat),dl=readDl(body.dl),repeat=readRp(body.repeat,body.date,!!dl);
-    const t={id:d.seq++,date:body.date,text,cat,done:false,dl,repeat,doneDates:[],skipDates:[]};d.todos.push(t);lsSave(d);return clone(t);
+    const t={id:d.seq++,date:body.date,text,cat,done:0,dl,repeat,doneDates:[],progressDates:[],skipDates:[]};d.todos.push(t);lsSave(d);return clone(t);
   }
   if(method==="POST"&&p==="/api/monthly"){
     const text=need(body.text,"할 일",200);
     if(!RE_MONTH.test(body.month||""))throw new ApiError(400,"월 형식이 올바르지 않아요");
-    const t={id:d.seq++,month:body.month,text,cat:catOk(body.cat),done:false};
+    const t={id:d.seq++,month:body.month,text,cat:catOk(body.cat),done:0};
     (d.monthly[body.month]=d.monthly[body.month]||[]).push(t);lsSave(d);return clone(t);
   }
   if(method==="PATCH"&&(m=p.match(/^\/api\/todos\/(\d+)$/))){
@@ -104,17 +117,22 @@ async function api(method,url,body){
     }
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
     if(body.done!==undefined){
+      const v=body.done;
+      if(![0,1,2].includes(v))throw new ApiError(400,"상태 값이 올바르지 않아요");
       if(t.repeat){
-        if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 완료할 날짜가 필요해요");
-        const set=new Set(t.doneDates||[]);body.done?set.add(body.date):set.delete(body.date);t.doneDates=[...set].sort();
-      }else t.done=!!body.done;
+        if(!RE_DATE.test(body.date||"")||isNaN(Date.parse(body.date)))throw new ApiError(400,"반복 일정은 상태를 바꿀 날짜가 필요해요");
+        t.doneDates=(t.doneDates||[]).filter(x=>x!==body.date);
+        t.progressDates=(t.progressDates||[]).filter(x=>x!==body.date);
+        if(v===1)t.progressDates=[...t.progressDates,body.date].sort();
+        if(v===2)t.doneDates=[...t.doneDates,body.date].sort();
+      }else t.done=v;
     }
     if(body.cat!==undefined)t.cat=catOk(body.cat);
     if("dl" in body||"repeat" in body){
       const dl="dl" in body?readDl(body.dl):(t.dl||null);
       const repeat="repeat" in body?readRp(body.repeat,t.date,!!dl):(t.repeat||null);
       if(dl&&repeat)throw new ApiError(400,"반복 일정에는 마감일을 함께 설정할 수 없어요");
-      if(t.repeat&&!repeat){t.doneDates=[];t.skipDates=[]}
+      if(t.repeat&&!repeat){t.doneDates=[];t.progressDates=[];t.skipDates=[]}
       t.dl=dl;t.repeat=repeat;
     }
     lsSave(d);return clone(t);
@@ -122,7 +140,10 @@ async function api(method,url,body){
   if(method==="PATCH"&&(m=p.match(/^\/api\/monthly\/(\d+)$/))){
     const t=find(Object.values(d.monthly).flat(),m[1]);
     if(body.text!==undefined)t.text=need(body.text,"할 일",200);
-    if(body.done!==undefined)t.done=!!body.done;
+    if(body.done!==undefined){
+      if(![0,1,2].includes(body.done))throw new ApiError(400,"상태 값이 올바르지 않아요");
+      t.done=body.done;
+    }
     if(body.cat!==undefined)t.cat=catOk(body.cat);
     lsSave(d);return clone(t);
   }

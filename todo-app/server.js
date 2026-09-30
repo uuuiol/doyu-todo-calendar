@@ -41,6 +41,13 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_monthly_month ON monthly(month);
 `);
+// migration: "done" used to be a boolean (1 = done); it is now tri-state (0=todo,1=progress,2=done).
+// Old DBs get a one-time remap so previously-done rows land on 2, not on the new "progress" value 1.
+if (db.prepare("PRAGMA user_version").get().user_version < 1) {
+  db.exec("UPDATE todos SET done=2 WHERE done=1");
+  db.exec("UPDATE monthly SET done=2 WHERE done=1");
+  db.exec("PRAGMA user_version = 1");
+}
 // migration: recurring todos (older DBs lack these columns) + per-occurrence completion
 const todoCols = db.prepare("PRAGMA table_info(todos)").all().map((c) => c.name);
 for (const c of ["repeat_type", "repeat_days", "repeat_until"]) if (!todoCols.includes(c)) db.exec(`ALTER TABLE todos ADD COLUMN ${c} TEXT`);
@@ -50,6 +57,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS todo_done (
   PRIMARY KEY (todo_id, date)
 )`);
 db.exec(`CREATE TABLE IF NOT EXISTS todo_skip (
+  todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  PRIMARY KEY (todo_id, date)
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS todo_progress (
   todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
   date TEXT NOT NULL,
   PRIMARY KEY (todo_id, date)
@@ -71,6 +83,7 @@ const str = (v, name, max) => {
   if (v.trim().length > max) throw bad(`${name}은(는) ${max}자 이하여야 해요`);
   return v.trim();
 };
+const triState = (v) => { if (![0, 1, 2].includes(v)) throw bad("상태 값이 올바르지 않아요"); return v; };
 const catExists = (n) => {
   if (!db.prepare("SELECT 1 FROM categories WHERE name=?").get(n)) throw bad("존재하지 않는 카테고리예요");
   return n;
@@ -78,17 +91,19 @@ const catExists = (n) => {
 
 // ---------- row mappers ----------
 const todoOut = (r) => ({
-  id: r.id, date: r.date, text: r.text, cat: r.cat, done: !!r.done,
+  id: r.id, date: r.date, text: r.text, cat: r.cat, done: r.done,
   dl: r.dl_date ? { date: r.dl_date, label: r.dl_label || "" } : null,
   repeat: r.repeat_type
     ? { type: r.repeat_type, days: r.repeat_days ? r.repeat_days.split(",").map(Number) : [], until: r.repeat_until || null }
     : null,
   // recurring todos are completed per date, not as a whole
   doneDates: r.repeat_type ? db.prepare("SELECT date FROM todo_done WHERE todo_id=? ORDER BY date").all(r.id).map((x) => x.date) : [],
+  // days a recurring todo is "in progress" (▲) or fully done (✓)
+  progressDates: r.repeat_type ? db.prepare("SELECT date FROM todo_progress WHERE todo_id=? ORDER BY date").all(r.id).map((x) => x.date) : [],
   // days of a recurring todo that were skipped ("이 날만 건너뛰기")
   skipDates: r.repeat_type ? db.prepare("SELECT date FROM todo_skip WHERE todo_id=? ORDER BY date").all(r.id).map((x) => x.date) : [],
 });
-const monthlyOut = (r) => ({ id: r.id, month: r.month, text: r.text, cat: r.cat, done: !!r.done });
+const monthlyOut = (r) => ({ id: r.id, month: r.month, text: r.text, cat: r.cat, done: r.done });
 
 // ---------- handlers ----------
 const routes = [];
@@ -193,11 +208,14 @@ route("PATCH", "/api/todos/(\\d+)", ([, id], { body }) => {
   }
   let done = row.done;
   if (body.done !== undefined) {
+    const v = triState(body.done);
     if (row.repeat_type) {
-      if (!validDate(body.date)) throw bad("반복 일정은 완료할 날짜가 필요해요");
-      if (body.done) db.prepare("INSERT OR IGNORE INTO todo_done(todo_id,date) VALUES (?,?)").run(id, body.date);
-      else db.prepare("DELETE FROM todo_done WHERE todo_id=? AND date=?").run(id, body.date);
-    } else done = body.done ? 1 : 0;
+      if (!validDate(body.date)) throw bad("반복 일정은 상태를 바꿀 날짜가 필요해요");
+      db.prepare("DELETE FROM todo_done WHERE todo_id=? AND date=?").run(id, body.date);
+      db.prepare("DELETE FROM todo_progress WHERE todo_id=? AND date=?").run(id, body.date);
+      if (v === 1) db.prepare("INSERT INTO todo_progress(todo_id,date) VALUES (?,?)").run(id, body.date);
+      if (v === 2) db.prepare("INSERT INTO todo_done(todo_id,date) VALUES (?,?)").run(id, body.date);
+    } else done = v;
   }
   const cat = body.cat !== undefined ? catExists(body.cat) : row.cat;
   let dlDate = row.dl_date, dlLabel = row.dl_label, rType = row.repeat_type, rDays = row.repeat_days, rUntil = row.repeat_until;
@@ -206,6 +224,7 @@ route("PATCH", "/api/todos/(\\d+)", ([, id], { body }) => {
   if (dlDate && rType) throw bad("반복 일정에는 마감일을 함께 설정할 수 없어요");
   if (row.repeat_type && !rType) { // no longer recurring: drop per-day records
     db.prepare("DELETE FROM todo_done WHERE todo_id=?").run(id);
+    db.prepare("DELETE FROM todo_progress WHERE todo_id=?").run(id);
     db.prepare("DELETE FROM todo_skip WHERE todo_id=?").run(id);
   }
   db.prepare("UPDATE todos SET text=?, done=?, cat=?, dl_date=?, dl_label=?, repeat_type=?, repeat_days=?, repeat_until=? WHERE id=?")
@@ -230,7 +249,7 @@ route("PATCH", "/api/monthly/(\\d+)", ([, id], { body }) => {
   const row = db.prepare("SELECT * FROM monthly WHERE id=?").get(id);
   if (!row) throw new HttpError(404, "할 일을 찾을 수 없어요");
   const text = body.text !== undefined ? str(body.text, "할 일", 200) : row.text;
-  const done = body.done !== undefined ? (body.done ? 1 : 0) : row.done;
+  const done = body.done !== undefined ? triState(body.done) : row.done;
   const cat = body.cat !== undefined ? catExists(body.cat) : row.cat;
   db.prepare("UPDATE monthly SET text=?, done=?, cat=? WHERE id=?").run(text, done, cat, id);
   return monthlyOut(db.prepare("SELECT * FROM monthly WHERE id=?").get(id));
