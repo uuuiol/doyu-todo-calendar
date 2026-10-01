@@ -10,14 +10,15 @@
 body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:40px 60px;min-height:100vh}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
-.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:10px}
+.motto-box{margin-bottom:24px;display:flex;align-items:center;gap:16px}
+.motto-logo{flex:none;width:48px;height:48px;object-fit:contain}
+.motto-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
 .motto-head{display:flex;justify-content:flex-end}
-.motto-list{display:flex;flex-direction:column;gap:10px}
+.motto-list{display:flex;flex-direction:column;gap:10px;overflow-x:auto}
 .motto-list:empty{display:none}
 .motto-item{display:flex;align-items:center;gap:10px;padding:2px 0}
-.motto-item .motto-cat{flex:none;width:32px;height:32px;object-fit:contain}
-.motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
-.motto-item .motto-actions{flex:none;display:flex;gap:2px;padding-top:2px}
+.motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:nowrap}
+.motto-item .motto-actions{flex:none;display:flex;gap:2px}
 .motto-item .motto-actions button{background:none;color:var(--sub);border-radius:8px;padding:4px 7px;font-size:13px}
 .motto-item .motto-actions button:hover{color:var(--ink);background:var(--soft)}
 .motto-empty{color:var(--sub);font-size:14px}
@@ -176,17 +177,20 @@ button{cursor:pointer;border:0}
 </head>
 <body>
 <section class="card motto-box">
-  <div class="motto-head"><button class="edit-btn" id="mottoEditToggle">✎ 수정</button></div>
-  <div class="motto-list" id="mottoList"></div>
-  <div class="motto-editor" id="mottoEditor" hidden>
-    <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요 (Shift+Enter로 줄바꿈)"></textarea>
-    <div class="motto-editor-foot">
+  <img class="motto-logo" src="cat.webp" alt="">
+  <div class="motto-body">
+    <div class="motto-head"><button class="edit-btn" id="mottoEditToggle">✎ 수정</button></div>
+    <div class="motto-list" id="mottoList"></div>
+    <div class="motto-editor" id="mottoEditor" hidden>
+      <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요"></textarea>
+      <div class="motto-editor-foot">
       <span class="motto-count" id="mottoCount">0/200</span>
       <div class="row" style="gap:8px">
         <button class="btn" id="mottoCancel">취소</button>
         <button class="btn dark" id="mottoSave">저장</button>
       </div>
     </div>
+  </div>
   </div>
 </section>
 
@@ -567,7 +571,7 @@ let mottoEditId=null,mottoEdit=false;
 function renderMotto(){
   const list=S.mottos||[];
   $("mottoList").innerHTML=list.length?list.map(m=>
-    `<div class="motto-item" data-id="${m.id}"><img class="motto-cat" src="cat.webp" alt=""><p class="motto-text">${esc(m.text)}</p>
+    `<div class="motto-item" data-id="${m.id}"><p class="motto-text">${esc(m.text)}</p>
     ${mottoEdit?'<div class="motto-actions"><button class="ed" title="수정" aria-label="수정">✎</button><button class="x" title="삭제" aria-label="삭제">×</button></div>':""}</div>`
   ).join(""):'<p class="motto-empty">나만의 문구를 추가해보세요</p>';
   if(mottoEdit&&list.length<MOTTO_CAP)$("mottoList").insertAdjacentHTML("beforeend",'<button class="motto-add-mini" id="mottoAddBtn">+ 문구 추가</button>');
