@@ -13,10 +13,9 @@ body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","App
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
 .page-logo{display:block;width:40px;height:40px;object-fit:contain;margin-bottom:10px}
-.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:10px}
-section.motto-box{border-color:var(--ink)}
-.motto-head{display:flex;justify-content:flex-end}
-.motto-list{display:flex;flex-direction:column;gap:10px;overflow-x:auto}
+.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:10px;position:relative}
+.motto-head{position:absolute;top:0;right:0}
+.motto-list{display:flex;flex-direction:column;gap:10px;overflow-x:auto;padding-right:68px}
 .motto-list:empty{display:none}
 .motto-item{display:flex;align-items:center;gap:10px;padding:2px 0}
 .motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:nowrap}
@@ -59,6 +58,7 @@ section.motto-box{border-color:var(--ink)}
 /* main layout */
 .main{display:grid;grid-template-columns:480px 1fr;gap:24px;margin-top:24px;align-items:start}
 .left{display:flex;flex-direction:column;gap:16px}
+.right{display:flex;flex-direction:column;gap:16px;min-width:0}
 .panel{border-color:var(--line2);padding:24px;display:flex;flex-direction:column;gap:16px}
 
 /* calendar */
@@ -194,17 +194,6 @@ section.motto-box{border-color:var(--ink)}
   </div>
 </section>
 
-<section class="card month">
-  <div class="row">
-    <h2 id="mTitle"></h2>
-    <input class="inp grow" id="mText" type="text" placeholder="이번 달에 꼭 하고 싶은 일을 적어보세요">
-    <div class="sel"><i id="mDot"></i><select id="mCat"></select></div>
-    <button class="btn" id="mCancel" hidden>취소</button>
-    <button class="btn dark" id="mAdd">추가</button>
-  </div>
-  <div class="list" id="mList"></div>
-</section>
-
 <div class="main">
   <div class="left">
     <section class="card">
@@ -220,6 +209,7 @@ section.motto-box{border-color:var(--ink)}
     </section>
   </div>
 
+  <div class="right">
   <section class="card panel">
     <div class="ph">
       <div><h2 id="dTitle"></h2><p id="dSub"></p></div>
@@ -278,6 +268,18 @@ section.motto-box{border-color:var(--ink)}
 
     <div class="list" id="list"></div>
   </section>
+
+  <section class="card month">
+    <div class="row">
+      <h2 id="mTitle"></h2>
+      <input class="inp grow" id="mText" type="text" placeholder="이번 달에 꼭 하고 싶은 일을 적어보세요">
+      <div class="sel"><i id="mDot"></i><select id="mCat"></select></div>
+      <button class="btn" id="mCancel" hidden>취소</button>
+      <button class="btn dark" id="mAdd">추가</button>
+    </div>
+    <div class="list" id="mList"></div>
+  </section>
+  </div>
 </div>
 
 <div id="toast"></div>
