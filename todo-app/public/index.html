@@ -14,7 +14,8 @@ button{cursor:pointer;border:0}
 .motto-head{display:flex;justify-content:flex-end}
 .motto-list{display:flex;flex-direction:column;gap:10px}
 .motto-list:empty{display:none}
-.motto-item{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
+.motto-item{display:flex;align-items:center;gap:10px;padding:2px 0}
+.motto-item .motto-cat{flex:none;width:32px;height:32px;object-fit:contain}
 .motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
 .motto-item .motto-actions{flex:none;display:flex;gap:2px;padding-top:2px}
 .motto-item .motto-actions button{background:none;color:var(--sub);border-radius:8px;padding:4px 7px;font-size:13px}
@@ -397,7 +398,7 @@ let mottoEditId=null,mottoEdit=false;
 function renderMotto(){
   const list=S.mottos||[];
   $("mottoList").innerHTML=list.length?list.map(m=>
-    `<div class="motto-item" data-id="${m.id}"><p class="motto-text">${esc(m.text)}</p>
+    `<div class="motto-item" data-id="${m.id}"><img class="motto-cat" src="cat.webp" alt=""><p class="motto-text">${esc(m.text)}</p>
     ${mottoEdit?'<div class="motto-actions"><button class="ed" title="수정" aria-label="수정">✎</button><button class="x" title="삭제" aria-label="삭제">×</button></div>':""}</div>`
   ).join(""):'<p class="motto-empty">나만의 문구를 추가해보세요</p>';
   if(mottoEdit&&list.length<MOTTO_CAP)$("mottoList").insertAdjacentHTML("beforeend",'<button class="motto-add-mini" id="mottoAddBtn">+ 문구 추가</button>');

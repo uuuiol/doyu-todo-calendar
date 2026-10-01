@@ -191,4 +191,9 @@ out = out.replace("</body>", '<p style="text-align:center;color:#8a8f98;font-siz
 fs.mkdirSync(path.join(root, "docs"), { recursive: true });
 fs.writeFileSync(path.join(root, "docs/index.html"), out);
 fs.writeFileSync(path.join(root, "docs/.nojekyll"), "");
+// static assets referenced by index.html (images, etc.) — copy as-is alongside it
+for (const name of ["cat.webp"]) {
+  const from = path.join(root, "todo-app/public", name);
+  if (fs.existsSync(from)) fs.copyFileSync(from, path.join(root, "docs", name));
+}
 console.log("built docs/index.html (" + out.length + " bytes)");
