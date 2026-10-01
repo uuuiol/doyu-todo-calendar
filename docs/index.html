@@ -12,9 +12,9 @@
 body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:40px 60px;min-height:100vh}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
-.motto-box{margin-bottom:24px;display:flex;align-items:center;gap:16px}
-.motto-logo{flex:none;width:48px;height:48px;object-fit:contain}
-.motto-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.page-logo{display:block;width:40px;height:40px;object-fit:contain;margin-bottom:10px}
+.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:10px}
+section.motto-box{border-color:#e5484d}
 .motto-head{display:flex;justify-content:flex-end}
 .motto-list{display:flex;flex-direction:column;gap:10px;overflow-x:auto}
 .motto-list:empty{display:none}
@@ -53,7 +53,7 @@ button{cursor:pointer;border:0}
 .btn.sm{padding:8px 12px;font-size:13px}
 
 /* monthly */
-.month h2{font-size:14px;font-weight:600;color:var(--sub);margin-bottom:14px}
+.month h2{font-size:14px;font-weight:600;color:var(--sub);flex:none;white-space:nowrap}
 .month .list{margin-top:14px}
 
 /* main layout */
@@ -178,14 +178,13 @@ button{cursor:pointer;border:0}
 </style>
 </head>
 <body>
+<img class="page-logo" src="cat.webp" alt="">
 <section class="card motto-box">
-  <img class="motto-logo" src="cat.webp" alt="">
-  <div class="motto-body">
-    <div class="motto-head"><button class="edit-btn" id="mottoEditToggle">✎ 수정</button></div>
-    <div class="motto-list" id="mottoList"></div>
-    <div class="motto-editor" id="mottoEditor" hidden>
-      <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요"></textarea>
-      <div class="motto-editor-foot">
+  <div class="motto-head"><button class="edit-btn" id="mottoEditToggle">✎ 수정</button></div>
+  <div class="motto-list" id="mottoList"></div>
+  <div class="motto-editor" id="mottoEditor" hidden>
+    <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요"></textarea>
+    <div class="motto-editor-foot">
       <span class="motto-count" id="mottoCount">0/200</span>
       <div class="row" style="gap:8px">
         <button class="btn" id="mottoCancel">취소</button>
@@ -193,12 +192,11 @@ button{cursor:pointer;border:0}
       </div>
     </div>
   </div>
-  </div>
 </section>
 
 <section class="card month">
-  <h2 id="mTitle"></h2>
   <div class="row">
+    <h2 id="mTitle"></h2>
     <input class="inp grow" id="mText" type="text" placeholder="이번 달에 꼭 하고 싶은 일을 적어보세요">
     <div class="sel"><i id="mDot"></i><select id="mCat"></select></div>
     <button class="btn" id="mCancel" hidden>취소</button>
