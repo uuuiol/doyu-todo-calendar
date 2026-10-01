@@ -10,13 +10,11 @@
 body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:40px 60px;min-height:100vh}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
-h1{font-size:24px;font-weight:700}
-h1{margin-bottom:24px}
 .motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:14px}
 .motto-list{display:flex;flex-direction:column;gap:10px}
 .motto-list:empty{display:none}
 .motto-item{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
-.motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word;border-left:3px solid var(--line2);padding-left:12px}
+.motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
 .motto-item .motto-actions{flex:none;display:flex;gap:2px;padding-top:2px}
 .motto-item .motto-actions button{background:none;color:var(--sub);border-radius:8px;padding:4px 7px;font-size:13px}
 .motto-item .motto-actions button:hover{color:var(--ink);background:var(--soft)}
@@ -176,7 +174,6 @@ h1{margin-bottom:24px}
 </style>
 </head>
 <body>
-<h1>DoYu Todo Calendar</h1>
 <section class="card motto-box">
   <div class="motto-list" id="mottoList"></div>
   <div class="motto-editor" id="mottoEditor" hidden>
