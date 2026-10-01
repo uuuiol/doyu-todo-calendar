@@ -24,11 +24,16 @@ function lsLoad(){
       };
       (d.todos||[]).forEach(fix);
       Object.values(d.monthly||{}).flat().forEach(fix);
+      if(!Array.isArray(d.mottos)){
+        d.mottos=(typeof d.motto==="string"&&d.motto.trim())?[{id:(d.seq=(d.seq||1)+1)-1,text:d.motto.trim()}]:[];
+        changed=true;
+      }
+      if("motto" in d){delete d.motto;changed=true}
       if(changed)lsSave(d);
       return d;
     }
   }catch(e){}
-  return {cats:DEF_CATS.map(c=>({...c})),todos:[],monthly:{},seq:1,motto:""};
+  return {cats:DEF_CATS.map(c=>({...c})),todos:[],monthly:{},seq:1,mottos:[]};
 }
 function lsSave(d){
   try{localStorage.setItem(LS_KEY,JSON.stringify(d))}
@@ -66,11 +71,26 @@ async function api(method,url,body){
   const hasCat=n=>d.cats.some(c=>c.n===n);
   const catOk=n=>{if(!hasCat(n))throw new ApiError(400,"존재하지 않는 카테고리예요");return n};
   const find=(arr,id)=>{const t=arr.find(x=>x.id===+id);if(!t)throw new ApiError(404,"할 일을 찾을 수 없어요");return t};
-  if(method==="GET"&&p==="/api/state")return clone({cats:d.cats,todos:d.todos,monthly:d.monthly,motto:d.motto||""});
-  if(method==="PUT"&&p==="/api/motto"){
-    const text=typeof body.text==="string"?body.text.trim():"";
+  if(method==="GET"&&p==="/api/state")return clone({cats:d.cats,todos:d.todos,monthly:d.monthly,mottos:d.mottos||[]});
+  const mottoText=v=>{
+    if(typeof v!=="string"||!v.trim())throw new ApiError(400,"문구를 입력하세요");
+    const text=v.trim();
     if(text.length>200)throw new ApiError(400,"문구는 200자 이하여야 해요");
-    d.motto=text;lsSave(d);return {text};
+    return text;
+  };
+  if(method==="POST"&&p==="/api/mottos"){
+    const text=mottoText(body.text);
+    if((d.mottos||[]).length>=5)throw new ApiError(400,"문구는 최대 5개까지 추가할 수 있어요");
+    const m={id:d.seq++,text};(d.mottos=d.mottos||[]).push(m);lsSave(d);return clone(m);
+  }
+  if(method==="PATCH"&&(m=p.match(/^\/api\/mottos\/(\d+)$/))){
+    const mo=(d.mottos||[]).find(x=>x.id===+m[1]);
+    if(!mo)throw new ApiError(404,"문구를 찾을 수 없어요");
+    mo.text=mottoText(body.text);lsSave(d);return clone(mo);
+  }
+  if(method==="DELETE"&&(m=p.match(/^\/api\/mottos\/(\d+)$/))){
+    if(!(d.mottos||[]).some(x=>x.id===+m[1]))throw new ApiError(404,"문구를 찾을 수 없어요");
+    d.mottos=d.mottos.filter(x=>x.id!==+m[1]);lsSave(d);return null;
   }
 
   if(method==="POST"&&p==="/api/categories"){

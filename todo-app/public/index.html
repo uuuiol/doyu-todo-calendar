@@ -11,17 +11,25 @@ body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","App
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
 h1{font-size:24px;font-weight:700}
-.header-row{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 16px;margin-bottom:24px}
-.motto-wrap{display:flex;align-items:baseline;gap:8px;min-width:0}
-.motto-quote{font-size:20px;font-weight:500;color:var(--ink);border-left:3px solid var(--line2);padding-left:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60vw}
-.motto-quote.empty{color:var(--sub);font-weight:400;border-left-color:var(--line)}
-.header-row .edit-btn{flex:none;font-size:14px;padding:4px 8px}
-.motto-editor{display:none;flex-direction:column;gap:8px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:-12px 0 24px}
+h1{margin-bottom:24px}
+.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:14px}
+.motto-list{display:flex;flex-direction:column;gap:10px}
+.motto-list:empty{display:none}
+.motto-item{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
+.motto-item .motto-text{flex:1;min-width:0;font-size:20px;font-weight:500;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word;border-left:3px solid var(--line2);padding-left:12px}
+.motto-item .motto-actions{flex:none;display:flex;gap:2px;padding-top:2px}
+.motto-item .motto-actions button{background:none;color:var(--sub);border-radius:8px;padding:4px 7px;font-size:13px}
+.motto-item .motto-actions button:hover{color:var(--ink);background:var(--soft)}
+.motto-empty{color:var(--sub);font-size:14px}
+.motto-editor{display:none;flex-direction:column;gap:8px;background:var(--form);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
 .motto-editor.open{display:flex}
-.motto-editor textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:inherit;font-size:14px;resize:vertical;outline:none}
+.motto-editor textarea{width:100%;min-height:72px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:inherit;font-size:14px;resize:vertical;outline:none;white-space:pre-wrap;background:#fff}
 .motto-editor textarea:focus{border-color:var(--ink)}
 .motto-editor-foot{display:flex;justify-content:space-between;align-items:center}
 .motto-count{font-size:12px;color:var(--sub)}
+#mottoAddBtn{background:#fff;border:1.5px dashed var(--line2);color:var(--sub);border-radius:10px;padding:11px;font-size:14px;font-weight:600}
+#mottoAddBtn:hover{color:var(--ink);border-color:var(--ink)}
+#mottoAddBtn[hidden]{display:none}
 .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
 .label{font-size:12px;font-weight:600;color:var(--sub)}
 .row{display:flex;gap:8px;align-items:center}
@@ -168,23 +176,21 @@ h1{font-size:24px;font-weight:700}
 </style>
 </head>
 <body>
-<div class="header-row">
-  <h1>DoYu Todo Calendar</h1>
-  <div class="motto-wrap" id="mottoWrap">
-    <span class="motto-quote empty" id="mottoText">나만의 한마디를 적어보세요</span>
-    <button class="edit-btn" id="mottoEdit" title="문구 수정" aria-label="문구 수정">✎</button>
-  </div>
-</div>
-<div class="motto-editor" id="mottoEditor" hidden>
-  <textarea id="mottoInput" maxlength="200" placeholder="나만의 한마디를 두세 문장으로 적어보세요"></textarea>
-  <div class="motto-editor-foot">
-    <span class="motto-count" id="mottoCount">0/200</span>
-    <div class="row" style="gap:8px">
-      <button class="btn" id="mottoCancel">취소</button>
-      <button class="btn dark" id="mottoSave">저장</button>
+<h1>DoYu Todo Calendar</h1>
+<section class="card motto-box">
+  <div class="motto-list" id="mottoList"></div>
+  <div class="motto-editor" id="mottoEditor" hidden>
+    <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요 (Shift+Enter로 줄바꿈)"></textarea>
+    <div class="motto-editor-foot">
+      <span class="motto-count" id="mottoCount">0/200</span>
+      <div class="row" style="gap:8px">
+        <button class="btn" id="mottoCancel">취소</button>
+        <button class="btn dark" id="mottoSave">저장</button>
+      </div>
     </div>
   </div>
-</div>
+  <button id="mottoAddBtn">+ 문구 추가</button>
+</section>
 
 <section class="card month">
   <h2 id="mTitle"></h2>
@@ -389,23 +395,43 @@ function bindList(el,kind,arr,after){
   });
 }
 
+const MOTTO_CAP=5;
+let mottoEditId=null;
 function renderMotto(){
-  const t=(S.motto||"").trim();
-  const el=$("mottoText");
-  el.textContent=t||"나만의 한마디를 적어보세요";
-  el.classList.toggle("empty",!t);
+  const list=S.mottos||[];
+  $("mottoList").innerHTML=list.length?list.map(m=>
+    `<div class="motto-item" data-id="${m.id}"><p class="motto-text">${esc(m.text)}</p>
+    <div class="motto-actions"><button class="ed" title="수정" aria-label="수정">✎</button><button class="x" title="삭제" aria-label="삭제">×</button></div></div>`
+  ).join(""):'<p class="motto-empty">나만의 문구를 추가해보세요</p>';
+  $("mottoList").querySelectorAll(".motto-item").forEach(it=>{
+    const id=+it.dataset.id,m=list.find(x=>x.id===id);
+    it.querySelector(".ed").onclick=()=>openMottoEditor(true,m);
+    it.querySelector(".x").onclick=()=>run(async()=>{
+      S.mottos=S.mottos.filter(x=>x.id!==id);renderMotto();
+      await api("DELETE",`/api/mottos/${id}`);
+    });
+  });
+  $("mottoAddBtn").hidden=list.length>=MOTTO_CAP;
 }
-function openMottoEditor(o){
+function openMottoEditor(o,m){
+  mottoEditId=m?m.id:null;
   $("mottoEditor").classList.toggle("open",o);
-  if(o){$("mottoInput").value=S.motto||"";$("mottoCount").textContent=$("mottoInput").value.length+"/200";$("mottoInput").focus()}
+  if(o){$("mottoInput").value=m?m.text:"";$("mottoCount").textContent=$("mottoInput").value.length+"/200";$("mottoInput").focus()}
 }
-$("mottoEdit").onclick=()=>openMottoEditor(!$("mottoEditor").classList.contains("open"));
+$("mottoAddBtn").onclick=()=>openMottoEditor(true);
 $("mottoCancel").onclick=()=>openMottoEditor(false);
 $("mottoInput").oninput=e=>$("mottoCount").textContent=e.target.value.length+"/200";
+$("mottoInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("mottoSave").click()}};
 $("mottoSave").onclick=()=>run(async()=>{
-  const text=$("mottoInput").value.trim();
-  await api("PUT","/api/motto",{text});
-  S.motto=text;openMottoEditor(false);renderMotto();toast("문구를 저장했어요");
+  const text=$("mottoInput").value.trim();if(!text){$("mottoInput").focus();return}
+  if(mottoEditId!=null){
+    const m=await api("PATCH",`/api/mottos/${mottoEditId}`,{text});
+    const i=S.mottos.findIndex(x=>x.id===mottoEditId);if(i>=0)S.mottos[i]=m;
+  }else{
+    const m=await api("POST","/api/mottos",{text});
+    (S.mottos=S.mottos||[]).push(m);
+  }
+  openMottoEditor(false);renderMotto();toast("문구를 저장했어요");
 });
 
 function render(){

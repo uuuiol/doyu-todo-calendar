@@ -44,7 +44,21 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS mottos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+// migration: the single-line "motto" setting became a list of mottos.
+// Carry over whatever was saved there as the first entry, once.
+{
+  const old = db.prepare("SELECT value FROM settings WHERE key='motto'").get();
+  if (old && old.value && db.prepare("SELECT COUNT(*) c FROM mottos").get().c === 0) {
+    db.prepare("INSERT INTO mottos(text) VALUES (?)").run(old.value);
+  }
+  db.prepare("DELETE FROM settings WHERE key='motto'").run();
+}
 // migration: "done" used to be a boolean (1 = done); it is now tri-state (0=todo,1=progress,2=done).
 // Old DBs get a one-time remap so previously-done rows land on 2, not on the new "progress" value 1.
 if (db.prepare("PRAGMA user_version").get().user_version < 1) {
@@ -116,21 +130,39 @@ const route = (method, pattern, fn) => routes.push({ method, re: new RegExp("^" 
 route("GET", "/api/state", () => {
   const monthly = {};
   db.prepare("SELECT * FROM monthly ORDER BY id").all().forEach((r) => (monthly[r.month] ||= []).push(monthlyOut(r)));
-  const mottoRow = db.prepare("SELECT value FROM settings WHERE key='motto'").get();
   return {
     cats: db.prepare("SELECT name n, dot, bg, tx FROM categories ORDER BY id").all(),
     todos: db.prepare("SELECT * FROM todos ORDER BY date, id").all().map(todoOut),
     monthly,
-    motto: mottoRow ? mottoRow.value : "",
+    mottos: db.prepare("SELECT id, text FROM mottos ORDER BY id").all(),
   };
 });
 
-// Personal motto/quote shown next to the title. Empty text clears it.
-route("PUT", "/api/motto", (_, { body }) => {
-  const text = typeof body.text === "string" ? body.text.trim() : "";
+const mottoText = (v) => {
+  if (typeof v !== "string" || !v.trim()) throw bad("문구를 입력하세요");
+  const text = v.trim();
   if (text.length > 200) throw bad("문구는 200자 이하여야 해요");
-  db.prepare("INSERT INTO settings(key,value) VALUES ('motto',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(text);
-  return { text };
+  return text;
+};
+
+// Personal quotes/mottos shown in a box below the title. Up to 5 at a time.
+route("POST", "/api/mottos", (_, { body }) => {
+  const text = mottoText(body.text);
+  if (db.prepare("SELECT COUNT(*) c FROM mottos").get().c >= 5) throw bad("문구는 최대 5개까지 추가할 수 있어요");
+  const { lastInsertRowid } = db.prepare("INSERT INTO mottos(text) VALUES (?)").run(text);
+  return [201, db.prepare("SELECT id, text FROM mottos WHERE id=?").get(lastInsertRowid)];
+});
+
+route("PATCH", "/api/mottos/(\\d+)", ([, id], { body }) => {
+  if (!db.prepare("SELECT 1 FROM mottos WHERE id=?").get(id)) throw new HttpError(404, "문구를 찾을 수 없어요");
+  const text = mottoText(body.text);
+  db.prepare("UPDATE mottos SET text=? WHERE id=?").run(text, id);
+  return db.prepare("SELECT id, text FROM mottos WHERE id=?").get(id);
+});
+
+route("DELETE", "/api/mottos/(\\d+)", ([, id]) => {
+  if (!db.prepare("DELETE FROM mottos WHERE id=?").run(id).changes) throw new HttpError(404, "문구를 찾을 수 없어요");
+  return [204];
 });
 
 route("POST", "/api/categories", (_, { body }) => {
