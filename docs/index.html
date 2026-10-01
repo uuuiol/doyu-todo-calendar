@@ -10,7 +10,8 @@
 body{background:var(--bg);color:var(--ink);font-family:"Inter","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:40px 60px;min-height:100vh}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0}
-.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:14px}
+.motto-box{margin-bottom:24px;display:flex;flex-direction:column;gap:10px}
+.motto-head{display:flex;justify-content:flex-end}
 .motto-list{display:flex;flex-direction:column;gap:10px}
 .motto-list:empty{display:none}
 .motto-item{display:flex;align-items:flex-start;gap:10px;padding:2px 0}
@@ -25,9 +26,8 @@ button{cursor:pointer;border:0}
 .motto-editor textarea:focus{border-color:var(--ink)}
 .motto-editor-foot{display:flex;justify-content:space-between;align-items:center}
 .motto-count{font-size:12px;color:var(--sub)}
-#mottoAddBtn{background:#fff;border:1.5px dashed var(--line2);color:var(--sub);border-radius:10px;padding:11px;font-size:14px;font-weight:600}
-#mottoAddBtn:hover{color:var(--ink);border-color:var(--ink)}
-#mottoAddBtn[hidden]{display:none}
+.motto-add-mini{align-self:flex-start;background:#fff;border:1.5px dashed var(--line2);color:var(--sub);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600}
+.motto-add-mini:hover{color:var(--ink);border-color:var(--ink)}
 .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
 .label{font-size:12px;font-weight:600;color:var(--sub)}
 .row{display:flex;gap:8px;align-items:center}
@@ -175,6 +175,7 @@ button{cursor:pointer;border:0}
 </head>
 <body>
 <section class="card motto-box">
+  <div class="motto-head"><button class="edit-btn" id="mottoEditToggle">✎ 수정</button></div>
   <div class="motto-list" id="mottoList"></div>
   <div class="motto-editor" id="mottoEditor" hidden>
     <textarea id="mottoInput" maxlength="200" placeholder="나만의 문구를 적어보세요 (Shift+Enter로 줄바꿈)"></textarea>
@@ -186,7 +187,6 @@ button{cursor:pointer;border:0}
       </div>
     </div>
   </div>
-  <button id="mottoAddBtn">+ 문구 추가</button>
 </section>
 
 <section class="card month">
@@ -562,14 +562,15 @@ function bindList(el,kind,arr,after){
 }
 
 const MOTTO_CAP=5;
-let mottoEditId=null;
+let mottoEditId=null,mottoEdit=false;
 function renderMotto(){
   const list=S.mottos||[];
   $("mottoList").innerHTML=list.length?list.map(m=>
     `<div class="motto-item" data-id="${m.id}"><p class="motto-text">${esc(m.text)}</p>
-    <div class="motto-actions"><button class="ed" title="수정" aria-label="수정">✎</button><button class="x" title="삭제" aria-label="삭제">×</button></div></div>`
+    ${mottoEdit?'<div class="motto-actions"><button class="ed" title="수정" aria-label="수정">✎</button><button class="x" title="삭제" aria-label="삭제">×</button></div>':""}</div>`
   ).join(""):'<p class="motto-empty">나만의 문구를 추가해보세요</p>';
-  $("mottoList").querySelectorAll(".motto-item").forEach(it=>{
+  if(mottoEdit&&list.length<MOTTO_CAP)$("mottoList").insertAdjacentHTML("beforeend",'<button class="motto-add-mini" id="mottoAddBtn">+ 문구 추가</button>');
+  if(mottoEdit)$("mottoList").querySelectorAll(".motto-item").forEach(it=>{
     const id=+it.dataset.id,m=list.find(x=>x.id===id);
     it.querySelector(".ed").onclick=()=>openMottoEditor(true,m);
     it.querySelector(".x").onclick=()=>run(async()=>{
@@ -577,14 +578,16 @@ function renderMotto(){
       await api("DELETE",`/api/mottos/${id}`);
     });
   });
-  $("mottoAddBtn").hidden=list.length>=MOTTO_CAP;
+  const addBtn=$("mottoAddBtn");if(addBtn)addBtn.onclick=()=>openMottoEditor(true);
+  $("mottoEditToggle").textContent=mottoEdit?"완료":"✎ 수정";
+  $("mottoEditToggle").classList.toggle("on",mottoEdit);
 }
+$("mottoEditToggle").onclick=()=>{mottoEdit=!mottoEdit;if(!mottoEdit)openMottoEditor(false);renderMotto()};
 function openMottoEditor(o,m){
   mottoEditId=m?m.id:null;
   $("mottoEditor").classList.toggle("open",o);
   if(o){$("mottoInput").value=m?m.text:"";$("mottoCount").textContent=$("mottoInput").value.length+"/200";$("mottoInput").focus()}
 }
-$("mottoAddBtn").onclick=()=>openMottoEditor(true);
 $("mottoCancel").onclick=()=>openMottoEditor(false);
 $("mottoInput").oninput=e=>$("mottoCount").textContent=e.target.value.length+"/200";
 $("mottoInput").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("mottoSave").click()}};
